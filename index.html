@@ -37,6 +37,23 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);fo
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+/* ---------- splash ---------- */
+.splash{position:fixed;inset:0;z-index:100;background:radial-gradient(120% 80% at 50% 35%,#163a32 0%,#0b1412 60%,#070b0a 100%);color:#e9efed;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:max(24px,env(safe-area-inset-top,0px)) max(24px,env(safe-area-inset-right,0px)) max(24px,env(safe-area-inset-bottom,0px)) max(24px,env(safe-area-inset-left,0px));transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.splash.out{opacity:0;transform:scale(1.04);pointer-events:none}
+.splash .logo{width:min(56vw,240px);height:auto;overflow:visible;filter:drop-shadow(0 10px 40px rgba(65,195,162,.25));animation:logoIn .8s var(--spring) both}
+.splash h2{font-family:var(--f-display);font-size:clamp(2.2rem,10vw,3.4rem);margin:26px 0 6px;letter-spacing:-.02em;line-height:1;display:flex}
+.splash h2 span{display:inline-block;animation:letter .6s var(--spring) both}
+.splash .sub{color:#9fb1ac;font-size:.98rem;animation:fadeUp .6s .7s var(--ease) both}
+.splash .credit-s{position:absolute;left:0;right:0;bottom:max(28px,calc(env(safe-area-inset-bottom,0px) + 18px));text-align:center;font-size:.86rem;color:#8ea39d;animation:fadeUp .6s .9s var(--ease) both}
+.splash .skip{position:absolute;top:max(16px,env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));background:none;border:0;color:#8ea39d;font-size:.82rem;padding:10px;cursor:pointer;animation:fadeUp .5s 1.2s both}
+.lg-card{fill:#f4f7f6;stroke:none}
+.lg-ink{fill:#1d2b28}.lg-ink.soft{fill:#9fb1ac}
+.lg-photo{fill:#c9d6d2}
+.lg-line{fill:#41c3a2}
+.lg-beam{animation:beam 1.8s cubic-bezier(.45,.05,.55,.95) infinite}
+.lg-corner{fill:none;stroke:#41c3a2;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:28 200;animation:corners 1.8s var(--ease) infinite}
+.cc{font-weight:700;background:linear-gradient(90deg,#41c3a2,#7fd3ff,#b79bff,#ff9fd2,#ffd88a,#41c3a2);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ccShift 4s linear infinite}
+
 /* ---------- app bar ---------- */
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:31;background:var(--surface)}
 .appbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
@@ -75,11 +92,30 @@ h1{font-family:var(--f-display);font-size:1.25rem;letter-spacing:-.01em;margin:0
 .btn[disabled]{opacity:.4;cursor:not-allowed;transform:none}
 .btn svg{width:20px;height:20px;flex:none}
 
+/* ---------- start screen ---------- */
+.hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:26px 6px 8px;animation:enter .6s var(--ease) both}
+.hero .logo{width:min(52vw,190px);height:auto;overflow:visible;margin-bottom:6px}
+.hero h2{font-family:var(--f-display);font-size:clamp(1.6rem,7vw,2.2rem);margin:0;letter-spacing:-.015em;line-height:1.1;text-wrap:balance}
+.hero p{margin:0;color:var(--muted);max-width:34ch;text-wrap:balance}
+.hero .acts{display:grid;grid-template-columns:1fr;gap:10px;width:100%;max-width:380px;margin-top:8px}
+.hero .acts .btn{min-height:56px;font-size:1.04rem}
+.hero .tiny{font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+.hero .sample{background:none;border:0;color:var(--accent);font-weight:600;font-size:.9rem;padding:8px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:420px;margin-top:10px}
+.steps div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 6px;font-size:.76rem;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:6px;animation:enter .5s var(--ease) both}
+.steps div:nth-child(2){animation-delay:.08s}.steps div:nth-child(3){animation-delay:.16s}
+.steps b{font-family:var(--f-display);color:var(--ink);font-size:.86rem}
+.steps svg{width:22px;height:22px;color:var(--accent)}
+body:not(.has-cards) #out,body:not(.has-cards) .mbar,body:not(.has-cards) #drop{display:none}
+body.has-cards .hero{display:none}
+body:not(.has-cards) .grid{grid-template-columns:minmax(0,1fr)}
+body.has-cards #out{animation:enter .6s .1s var(--ease) both}
+
 /* ---------- add photos ---------- */
-.drop{position:relative;border:1.5px dashed var(--line);border-radius:var(--r);padding:18px;display:grid;gap:14px;background:var(--surface);transition:border-color .2s,background .2s,transform .2s var(--ease)}
+.drop{position:relative;border:1.5px dashed var(--line);border-radius:var(--r);padding:12px;display:grid;gap:10px;background:var(--surface);transition:border-color .2s,background .2s,transform .2s var(--ease)}
 .drop.over{border-color:var(--accent);background:var(--accent-soft);transform:scale(1.01)}
 .drop-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.drop-actions .btn{min-height:52px;font-size:1rem}
+.drop-actions .btn{min-height:46px}
 .drop p{margin:0;color:var(--muted);font-size:.88rem}
 .drop strong{color:var(--ink);font-weight:600}
 @media (min-width:600px){.drop{grid-template-columns:auto 1fr;align-items:center}.drop-actions{grid-template-columns:auto auto}}
@@ -96,6 +132,7 @@ h1{font-family:var(--f-display);font-size:1.25rem;letter-spacing:-.01em;margin:0
 .result .scan{position:absolute;inset:0;pointer-events:none;display:flex;align-items:flex-end;justify-content:center;padding:12px}
 .result .scan::before{content:"";position:absolute;left:0;right:0;height:38%;top:-40%;background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--accent) 22%,transparent) 70%,color-mix(in srgb,var(--accent) 70%,#fff) 98%,transparent);animation:sweep 1.4s var(--ease) infinite}
 .result .scan span{position:relative;font-family:var(--f-mono);font-size:.74rem;background:var(--surface);color:var(--ink);padding:4px 10px;border-radius:99px;box-shadow:var(--shadow)}
+.result.scanning .tap{display:none}
 .result .tap{position:absolute;right:10px;bottom:10px;font-size:.72rem;font-weight:600;background:color-mix(in srgb,var(--surface) 90%,transparent);padding:4px 9px;border-radius:99px;color:var(--muted);display:flex;gap:5px;align-items:center}
 .result .tap svg{width:13px;height:13px}
 .side{padding:14px 14px 12px;display:flex;flex-direction:column;gap:12px;min-width:0;border-top:1px solid var(--line)}
@@ -183,6 +220,12 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
 .ed-hint{text-align:center;font-size:.8rem;color:#9fb1ac;padding:4px 14px 0}
 @media (hover:none){.kbd-hint{display:none}}
 
+@keyframes beam{0%{transform:translateY(0)}50%{transform:translateY(86px)}100%{transform:translateY(0)}}
+@keyframes corners{0%{stroke-dashoffset:0}100%{stroke-dashoffset:-228}}
+@keyframes ccShift{to{background-position:300% 0}}
+@keyframes logoIn{from{opacity:0;transform:scale(.7) rotate(-6deg)}to{opacity:1;transform:none}}
+@keyframes letter{from{opacity:0;transform:translateY(18px) scale(.9)}to{opacity:1;transform:none}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes enter{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes leave{to{opacity:0;transform:translateX(30px) scale(.97)}}
 @keyframes settle{0%{opacity:0;transform:perspective(700px) rotateX(10deg) scale(.92)}100%{opacity:1;transform:none}}
@@ -208,15 +251,69 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
   <div class="holo" aria-hidden="true"></div>
 </header>
 
+<div class="splash" id="splash" role="presentation">
+  <button class="skip" id="skipSplash">Skip</button>
+  <svg class="logo" viewBox="0 0 120 84" aria-hidden="true">
+  <defs><linearGradient id="lgs" x1="0" x2="1"><stop offset="0" stop-color="#7fd3ff"/><stop offset=".35" stop-color="#b79bff"/><stop offset=".65" stop-color="#ff9fd2"/><stop offset="1" stop-color="#8ff0c0"/></linearGradient>
+  <clipPath id="lcs"><rect x="14" y="14" width="92" height="58" rx="6"/></clipPath></defs>
+  <rect class="lg-card" x="14" y="14" width="92" height="58" rx="6"/>
+  <g clip-path="url(#lcs)">
+    <rect class="lg-ink" x="22" y="24" width="34" height="4" rx="2"/>
+    <rect class="lg-ink soft" x="22" y="33" width="44" height="3" rx="1.5"/>
+    <rect class="lg-ink soft" x="22" y="40" width="38" height="3" rx="1.5"/>
+    <rect class="lg-ink soft" x="22" y="47" width="30" height="3" rx="1.5"/>
+    <rect x="22" y="58" width="50" height="4" rx="2" fill="url(#lgs)"/>
+    <rect class="lg-photo" x="76" y="24" width="22" height="28" rx="3"/>
+    <g class="lg-beam"><rect x="0" y="-14" width="120" height="14" fill="url(#lbs)"/><rect x="0" y="-1" width="120" height="2" class="lg-line"/></g>
+  </g>
+  <defs><linearGradient id="lbs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#41c3a2" stop-opacity="0"/><stop offset="1" stop-color="#41c3a2" stop-opacity=".45"/></linearGradient></defs>
+  <path class="lg-corner" d="M4 18V4h14M102 4h14v14M116 66v14h-14M18 80H4V66"/>
+</svg>
+  <h2 aria-label="CardFlat"><span aria-hidden="true" style="animation-delay:0.25s">C</span><span aria-hidden="true" style="animation-delay:0.31s">a</span><span aria-hidden="true" style="animation-delay:0.37s">r</span><span aria-hidden="true" style="animation-delay:0.43s">d</span><span aria-hidden="true" style="animation-delay:0.49s">F</span><span aria-hidden="true" style="animation-delay:0.55s">l</span><span aria-hidden="true" style="animation-delay:0.61s">a</span><span aria-hidden="true" style="animation-delay:0.67s">t</span></h2>
+  <div class="sub">Photo of a card in, flat scan out</div>
+  <div class="credit-s">crafted by <span class="cc">clickandcraft</span> in Milandhoo</div>
+</div>
+
 <div class="wrap">
   <div class="grid">
     <section aria-label="Cards">
+      <div class="hero" id="hero">
+        <svg class="logo" viewBox="0 0 120 84" aria-hidden="true">
+  <defs><linearGradient id="lgh" x1="0" x2="1"><stop offset="0" stop-color="#7fd3ff"/><stop offset=".35" stop-color="#b79bff"/><stop offset=".65" stop-color="#ff9fd2"/><stop offset="1" stop-color="#8ff0c0"/></linearGradient>
+  <clipPath id="lch"><rect x="14" y="14" width="92" height="58" rx="6"/></clipPath></defs>
+  <rect class="lg-card" x="14" y="14" width="92" height="58" rx="6"/>
+  <g clip-path="url(#lch)">
+    <rect class="lg-ink" x="22" y="24" width="34" height="4" rx="2"/>
+    <rect class="lg-ink soft" x="22" y="33" width="44" height="3" rx="1.5"/>
+    <rect class="lg-ink soft" x="22" y="40" width="38" height="3" rx="1.5"/>
+    <rect class="lg-ink soft" x="22" y="47" width="30" height="3" rx="1.5"/>
+    <rect x="22" y="58" width="50" height="4" rx="2" fill="url(#lgh)"/>
+    <rect class="lg-photo" x="76" y="24" width="22" height="28" rx="3"/>
+    <g class="lg-beam"><rect x="0" y="-14" width="120" height="14" fill="url(#lbh)"/><rect x="0" y="-1" width="120" height="2" class="lg-line"/></g>
+  </g>
+  <defs><linearGradient id="lbh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#41c3a2" stop-opacity="0"/><stop offset="1" stop-color="#41c3a2" stop-opacity=".45"/></linearGradient></defs>
+  <path class="lg-corner" d="M4 18V4h14M102 4h14v14M116 66v14h-14M18 80H4V66"/>
+</svg>
+        <h2>Scan an ID card</h2>
+        <p>Take a photo of the front, then the back. CardFlat finds the card, straightens it and saves it at real size.</p>
+        <div class="acts">
+          <button class="btn primary" id="heroCam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take photo</button>
+          <button class="btn" id="heroGal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/></svg>Choose from gallery</button>
+        </div>
+        <div class="steps">
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><b>1 · Snap</b>front &amp; back</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg><b>2 · Straighten</b>automatic</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><b>3 · Save</b>PDF or image</div>
+        </div>
+        <button class="sample" id="trySample">Try it with a sample card</button>
+        <div class="tiny"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Photos stay on this device</div>
+      </div>
       <div class="drop" id="drop">
         <div class="drop-actions">
           <button class="btn primary" id="camBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take photo</button>
           <button class="btn" id="addBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/></svg>Gallery</button>
         </div>
-        <p><strong>Front, back, or both.</strong> Each card is found, straightened and cropped automatically. You can also drop or paste photos. Nothing is uploaded.</p>
+        <p><strong>Add more cards.</strong> You can also drop or paste photos.</p>
         <input type="file" id="file" accept="image/*" multiple hidden>
         <input type="file" id="cam" accept="image/*" capture="environment" hidden>
       </div>
@@ -274,7 +371,7 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
       </div>
     </aside>
   </div>
-  <div class="credit">crafted by clickandcraft in Milandhoo</div>
+  <div class="credit">crafted by <span class="cc">clickandcraft</span> in Milandhoo</div>
 </div>
 
 <div class="mbar">
@@ -967,6 +1064,7 @@ function refreshPage(p, animate) {
   const txt = p.sample ? 'Sample' : st[0];
   if (chip.textContent !== txt) { chip.textContent = txt; chip.className = 'chip ' + (p.sample ? 'sample' : st[1]); chip.classList.remove('pop'); void chip.offsetWidth; chip.classList.add('pop'); }
   el.querySelector('.scan').hidden = p.status !== 'detecting';
+  if (p.status === 'detecting' || p.status === 'waiting') { drawSourcePreview(p); return; }
   if (!p.ready) return;
   const th = el.querySelector('.thumbsrc canvas'), tx = th.getContext('2d');
   const s = Math.max(104 / p.src.width, 104 / p.src.height);
@@ -977,13 +1075,49 @@ function refreshPage(p, animate) {
   el.querySelector('.thumbsrc .meta').textContent = `${fmtMM(w)} × ${fmtMM(h)} mm${p.rot ? ' · ' + p.rot + '°' : ''}${p.flip ? ' · mirrored' : ''}\nfrom ${p.src.width} × ${p.src.height} px photo`;
   const box = el.querySelector('.result'), rc = box.querySelector('canvas');
   const bw = Math.min(620, Math.max(240, (box.clientWidth || 360) - 32)) * Math.min(2, window.devicePixelRatio || 1);
+  box.classList.remove('scanning');
   const c = renderCard(p, clamp(bw / w, 1, 7.5));
   rc.width = c.width; rc.height = c.height; rc.getContext('2d').drawImage(c, 0, 0);
   if (animate && !REDUCED) { box.classList.remove('settle'); void box.offsetWidth; box.classList.add('settle'); }
 }
+// the raw photo, shown while the card is being found
+function sourceFrame(p) {
+  const box = p.el.querySelector('.result'), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const maxW = Math.max(240, (box.clientWidth || 360) - 32), maxH = 300;
+  const s = Math.min(maxW / p.src.width, maxH / p.src.height);
+  return { w: Math.round(p.src.width * s * dpr), h: Math.round(p.src.height * s * dpr), k: s * dpr };
+}
+function drawSourcePreview(p) {
+  const rc = p.el.querySelector('.result canvas'), f = sourceFrame(p);
+  rc.width = f.w; rc.height = f.h; rc.getContext('2d').drawImage(p.src, 0, 0, f.w, f.h);
+  p.el.querySelector('.result').classList.add('scanning');
+}
+// outline traces itself around the found card, then the flat card takes over
+function revealQuad(p) {
+  return new Promise(res => {
+    if (REDUCED || !p.el) return res();
+    const rc = p.el.querySelector('.result canvas'), f = sourceFrame(p), x = rc.getContext('2d');
+    rc.width = f.w; rc.height = f.h;
+    const q = p.quad.map(v => [v[0] * f.k, v[1] * f.k]);
+    const per = q.reduce((s, v, i) => s + Math.hypot(q[(i + 1) % 4][0] - v[0], q[(i + 1) % 4][1] - v[1]), 0);
+    const t0 = performance.now(), D = 900;
+    const frame = now => {
+      const t = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - t, 3);
+      x.clearRect(0, 0, f.w, f.h); x.drawImage(p.src, 0, 0, f.w, f.h);
+      const dim = Math.min(1, t * 1.6) * 0.55;
+      x.save(); x.fillStyle = `rgba(0,0,0,${dim})`; x.beginPath(); x.rect(0, 0, f.w, f.h);
+      x.moveTo(q[0][0], q[0][1]); for (let i = 3; i >= 0; i--) x.lineTo(q[i][0], q[i][1]); x.closePath(); x.fill('evenodd'); x.restore();
+      x.save(); x.beginPath(); q.forEach((v, i) => i ? x.lineTo(v[0], v[1]) : x.moveTo(v[0], v[1])); x.closePath();
+      x.setLineDash([per * e, per]); x.lineWidth = 3 * (f.k > 1 ? 1.5 : 1); x.strokeStyle = '#41c3a2'; x.shadowColor = 'rgba(65,195,162,.8)'; x.shadowBlur = 12; x.stroke(); x.restore();
+      q.forEach((v, i) => { const a = clamp((e - i * 0.18) * 3, 0, 1); if (!a) return; x.beginPath(); x.arc(v[0], v[1], 6 * a * (f.k > 1 ? 1.5 : 1), 0, Math.PI * 2); x.fillStyle = '#fff'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#0d6b58'; x.stroke(); });
+      if (t < 1) requestAnimationFrame(frame); else setTimeout(res, 260);
+    };
+    requestAnimationFrame(frame);
+  });
+}
 function relist(keepAnim) {
   const box = $('#pages'); box.innerHTML = '';
-  if (!pages.length) { box.innerHTML = '<div class="empty">No cards yet. Take or choose a photo of the front, then one of the back.</div>'; }
+  document.body.classList.toggle('has-cards', pages.length > 0);
   pages.forEach((p, i) => {
     if (keepAnim) p.el.style.animation = 'none';
     box.appendChild(p.el);
@@ -1039,6 +1173,8 @@ function runDetect(p) {
     await new Promise(r => requestAnimationFrame(() => setTimeout(r, 40)));
     let r = null; try { r = detectQuad(p); } catch (e) { console.error(e); }
     if (r) { p.quad = r.q; p.status = r.conf < 0.02 ? 'check' : 'auto'; p.cache = null; } else p.status = 'fallback';
+    p.el.querySelector('.scan').hidden = true;
+    if (r) await revealQuad(p);
     p.ready = true; refreshPage(p, true); schedulePreview();
   };
   detectQueue = detectQueue.then(job, job);
@@ -1259,6 +1395,13 @@ $('#mOut').onclick = () => $('#outPanel').scrollIntoView({ behavior: REDUCED ? '
 // ---------- input wiring ----------
 $('#addBtn').onclick = () => $('#file').click();
 $('#camBtn').onclick = () => $('#cam').click();
+$('#heroCam').onclick = () => $('#cam').click();
+$('#heroGal').onclick = () => $('#file').click();
+$('#trySample').onclick = async () => {
+  await addCanvas(makeSample(false), { sample: true, name: 'Front' });
+  await addCanvas(makeSample(true), { sample: true, name: 'Back' });
+  schedulePreview(10);
+};
 $('#file').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
 $('#cam').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
 const drop = $('#drop');
@@ -1316,10 +1459,12 @@ function makeSample(back) {
 
 
 syncSettings(); relist(); loadCV();
-(async () => {
-  await addCanvas(makeSample(false), { sample: true, name: 'Front' });
-  await addCanvas(makeSample(true), { sample: true, name: 'Back' });
-  schedulePreview(10);
+// opening screen
+(() => {
+  const sp = $('#splash'); let done = false;
+  const hide = () => { if (done) return; done = true; sp.classList.add('out'); setTimeout(() => sp.remove(), 600); };
+  $('#skipSplash').onclick = hide; sp.addEventListener('click', hide);
+  setTimeout(hide, REDUCED ? 500 : 2600);
 })();
 </script>
 
