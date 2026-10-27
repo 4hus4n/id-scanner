@@ -228,18 +228,16 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
         <h2>Output <small id="dimLabel"></small></h2>
         <div class="preview" id="previewBox"><canvas id="preview" width="10" height="10"></canvas></div>
         <div class="ctl"><span class="lbl">Layout</span>
-          <div class="seg wrap4" id="layoutSeg" role="group" aria-label="Layout">
-            <button data-v="stack">Stacked</button><button data-v="side">Side by side</button><button data-v="print">Print page</button><button data-v="separate">Separate</button>
+          <div class="seg" id="layoutSeg" role="group" aria-label="Layout">
+            <button data-v="stack">Stacked</button><button data-v="side">Side by side</button><button data-v="separate">Separate</button>
           </div>
         </div>
         <div class="two">
           <div class="ctl"><label for="size">Card size</label>
             <select id="size">
               <option value="id1">ID card · 85.6 × 54 mm</option>
-              <option value="id3">Passport · 125 × 88 mm</option>
-              <option value="a4">A4 document</option>
-              <option value="letter">Letter document</option>
-              <option value="auto">Match the photo</option>
+              <option value="id3">Passport card · 125 × 88 mm</option>
+              <option value="auto">Match photo shape</option>
               <option value="custom">Custom…</option>
             </select></div>
           <div class="ctl"><label for="fmt">Save as</label>
@@ -252,8 +250,8 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
         <div class="two">
           <div class="ctl"><label for="dpi">Resolution</label>
             <select id="dpi"><option value="150">150 dpi · small</option><option value="300" selected>300 dpi · print</option><option value="600">600 dpi · sharp</option></select></div>
-          <div class="ctl" id="paperCtl"><label for="paper">Paper</label>
-            <select id="paper"><option value="a4">A4 · 210 × 297</option><option value="letter">Letter · 8.5 × 11 in</option></select></div>
+          <div class="ctl"><label for="page">Page</label>
+            <select id="page"><option value="a4">A4 paper · real size</option><option value="letter">Letter paper · real size</option><option value="fit">Fit to cards</option></select></div>
         </div>
         <div class="two">
           <div class="ctl"><label for="gap">Gap <output id="gapO"></output></label><input type="range" id="gap" min="0" max="30" step="1" value="6"></div>
@@ -624,8 +622,12 @@ const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce
 let cv = null, cvState = 'loading';
 const pages = [];
 let uid = 1;
-const S = { layout: 'stack', size: 'id1', cw: 85.6, ch: 54, fmt: 'pdf', dpi: 300, paper: 'a4', gap: 6, margin: 5, round: true, guides: true, bg: 'white', bgColor: '#e8eceb', qual: 92, fname: 'id-card' };
+const S = { layout: 'stack', size: 'id1', cw: 85.6, ch: 54, fmt: 'pdf', dpi: 300, page: 'a4', gap: 6, margin: 5, round: true, guides: true, bg: 'white', bgColor: '#e8eceb', qual: 92, fname: 'id-card' };
 try { const saved = JSON.parse(localStorage.getItem('cardflat-settings') || 'null'); if (saved) Object.assign(S, saved); } catch (e) {}
+// older versions: page size lived in "card size" and a "print" layout
+if (S.size === 'a4' || S.size === 'letter') S.size = 'id1';
+if (S.layout === 'print') { S.layout = 'stack'; S.page = S.paper || 'a4'; }
+if (!['fit', 'a4', 'letter'].includes(S.page)) S.page = 'a4';
 const saveSettings = () => { try { localStorage.setItem('cardflat-settings', JSON.stringify(S)); } catch (e) {} };
 
 function toast(msg) {
@@ -658,7 +660,7 @@ function quadDims(q) {
 function baseMM(p) {
   const [qw, qh] = quadDims(p.quad);
   let w, h;
-  if (S.size === 'auto') { const r = qw / qh; if (r >= 1) { w = 100; h = 100 / r; } else { h = 100; w = 100 * r; } return [w, h]; }
+  if (S.size === 'auto') { const r = qw / qh; if (r >= 1) { w = 85.6; h = 85.6 / r; } else { h = 85.6; w = 85.6 * r; } return [w, h]; }
   [w, h] = S.size === 'custom' ? [+S.cw || 85.6, +S.ch || 54] : PRESETS[S.size];
   if ((qw >= qh) !== (w >= h)) [w, h] = [h, w];
   return [w, h];
@@ -774,22 +776,34 @@ function bgFill(forJpg) {
   return S.bg === 'color' ? S.bgColor : '#ffffff';
 }
 function layoutSheets() {
-  // returns [{wMM,hMM,items:[{p,x,y,w,h}]}] in mm
+  // returns [{wMM,hMM,items:[{p,x,y,w,h}],print}] in mm. Cards always keep their real size and shape.
   const live = pages.filter(p => p.ready);
   if (!live.length) return [];
   const g = S.gap, m = S.margin;
-  if (S.layout === 'separate') return live.map(p => { const [w, h] = finalMM(p); return { wMM: w + 2 * m, hMM: h + 2 * m, items: [{ p, x: m, y: m, w, h }] }; });
-  if (S.layout === 'print') {
-    const [pw, ph] = PAPER[S.paper]; const sheets = []; let cur = null, y = 0;
-    const top = Math.max(m, 12);
+  if (S.page !== 'fit' && PAPER[S.page]) {
+    const [pw, ph] = PAPER[S.page], mx = Math.max(m, 8), top = Math.max(m, 12), gg = Math.max(g, 4);
+    const maxW = pw - 2 * mx, maxH = ph - 2 * top;
+    const sheets = []; let cur = null, y = 0, row = [], rowW = 0, rowH = 0;
+    const newSheet = () => { cur = { wMM: pw, hMM: ph, items: [], print: true }; sheets.push(cur); y = top; };
+    const flush = () => {
+      if (!row.length) return;
+      if (!cur || y + rowH > ph - top + 0.01) newSheet();
+      let x = (pw - rowW) / 2;
+      row.forEach(it => { cur.items.push({ p: it.p, x, y: y + (rowH - it.h) / 2, w: it.w, h: it.h }); x += it.w + gg; });
+      y += rowH + gg; row = []; rowW = 0; rowH = 0;
+    };
     live.forEach(p => {
-      let [w, h] = finalMM(p); const maxW = pw - 2 * Math.max(m, 8), maxH = ph - 2 * top;
-      const s = Math.min(1, maxW / w, maxH / h); w *= s; h *= s;
-      if (!cur || y + h > ph - top + 0.01) { cur = { wMM: pw, hMM: ph, items: [], print: true }; sheets.push(cur); y = top; }
-      cur.items.push({ p, x: (pw - w) / 2, y, w, h }); y += h + Math.max(g, 4);
+      let [w, h] = finalMM(p); const s = Math.min(1, maxW / w, maxH / h); w *= s; h *= s;
+      const it = { p, w, h };
+      if (S.layout === 'side' && row.length && rowW + gg + w <= maxW + 0.01) { row.push(it); rowW += gg + w; rowH = Math.max(rowH, h); }
+      else { flush(); row = [it]; rowW = w; rowH = h; }
+      if (S.layout === 'separate') { flush(); cur = null; }
+      else if (S.layout === 'stack') flush();
     });
+    flush();
     return sheets;
   }
+  if (S.layout === 'separate') return live.map(p => { const [w, h] = finalMM(p); return { wMM: w + 2 * m, hMM: h + 2 * m, items: [{ p, x: m, y: m, w, h }] }; });
   const items = []; let x = m, y = m, W = 0, H = 0;
   live.forEach(p => {
     const [w, h] = finalMM(p);
@@ -851,7 +865,7 @@ function updateExportLabel(sheets) {
   $('#exportLbl').textContent = lbl; $('#mExport').textContent = n ? (multi ? `Save ${n} ${f}` : `Save ${f}`) : 'Save';
   $('#exportBtn').disabled = $('#mExport').disabled = !n;
   const sample = pages.some(p => p.sample);
-  $('#mbarMeta').textContent = n ? `${n} card${n > 1 ? 's' : ''}${sample ? ' (sample)' : ''} · ${({ stack: 'Stacked', side: 'Side by side', print: 'Print page', separate: 'Separate' })[S.layout]} · ${S.dpi} dpi` : 'No cards yet';
+  $('#mbarMeta').textContent = n ? `${n} card${n > 1 ? 's' : ''}${sample ? ' (sample)' : ''} · ${({ stack: 'Stacked', side: 'Side by side', separate: 'Separate' })[S.layout]}${S.page !== 'fit' ? ' · ' + (S.page === 'a4' ? 'A4' : 'Letter') : ''} · ${S.dpi} dpi` : 'No cards yet';
 }
 
 
@@ -1212,13 +1226,12 @@ async function doExport() {
 function syncSettings() {
   document.querySelectorAll('#layoutSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S.layout));
   document.querySelectorAll('#bgSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S.bg));
-  $('#size').value = S.size; $('#fmt').value = S.fmt; $('#dpi').value = String(S.dpi); $('#paper').value = S.paper;
+  $('#size').value = S.size; $('#fmt').value = S.fmt; $('#dpi').value = String(S.dpi); $('#page').value = S.page;
   $('#gap').value = S.gap; $('#margin').value = S.margin; $('#round').checked = S.round; $('#guides').checked = S.guides;
   $('#bgColor').value = S.bgColor; $('#qual').value = S.qual; $('#fname').value = S.fname; $('#cw').value = S.cw; $('#ch').value = S.ch;
   $('#gapO').textContent = S.gap + ' mm'; $('#marginO').textContent = S.margin + ' mm'; $('#qualO').textContent = S.qual + '%';
   $('#customRow').hidden = S.size !== 'custom';
-  $('#paperCtl').style.visibility = S.layout === 'print' ? 'visible' : 'hidden';
-  $('#guidesCtl').hidden = S.layout !== 'print';
+  $('#guidesCtl').hidden = S.page === 'fit';
   $('#bgColor').hidden = S.bg !== 'color';
   $('#qualCtl').hidden = S.fmt === 'png';
   $('#bgSeg button[data-v=transparent]').disabled = S.fmt !== 'png';
@@ -1230,7 +1243,7 @@ $('#bgSeg').onclick = e => { const b = e.target.closest('button'); if (b && !b.d
 $('#size').onchange = e => { S.size = e.target.value; onSetting(true, true); };
 $('#fmt').onchange = e => { S.fmt = e.target.value; if (S.fmt !== 'png' && S.bg === 'transparent') S.bg = 'white'; onSetting(); };
 $('#dpi').onchange = e => { S.dpi = +e.target.value; onSetting(); };
-$('#paper').onchange = e => { S.paper = e.target.value; onSetting(false, true); };
+$('#page').onchange = e => { S.page = e.target.value; onSetting(false, true); };
 $('#gap').oninput = e => { S.gap = +e.target.value; onSetting(); };
 $('#margin').oninput = e => { S.margin = +e.target.value; onSetting(); };
 $('#round').onchange = e => { S.round = e.target.checked; onSetting(true); };
