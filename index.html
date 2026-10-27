@@ -132,7 +132,7 @@ body:not(.has-cards) .wrap{min-height:calc(100dvh - 64px - env(safe-area-inset-t
 body:not(.has-cards) .grid{flex:1;align-content:center}
 body:not(.has-cards) .credit{margin-top:8px}
 .scene-fit{--sc:.56;width:calc(288px * var(--sc));height:calc(242px * var(--sc));position:relative;flex:none}
-.scene-fit>.scene,.scene-fit>.sc-cap{position:absolute;left:50%;width:288px;margin:0;transform-origin:top center;transform:translateX(-50%) scale(var(--sc))}
+.scene-fit>.scene,.scene-fit>.sc-cap{position:absolute;left:50%;width:288px;max-width:none;margin:0;transform-origin:top center;transform:translateX(-50%) scale(var(--sc))}
 .scene-fit>.scene{top:0}
 .scene-fit>.sc-cap{top:calc(220px * var(--sc) + 2px);transform:translateX(-50%)}
 @media (min-height:700px){.scene-fit{--sc:.66}}
