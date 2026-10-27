@@ -3,9 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Photo of an ID card in, flat scan out. Auto crop, straighten and save front and back as one PDF or image. Runs in your browser.">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="IdScanner">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta property="og:type" content="website">
+<meta property="og:title" content="IdScanner">
+<meta property="og:description" content="Photo of an ID card in, flat scan out. Auto crop, straighten, save as PDF or image.">
+<meta property="og:image" content="https://4hus4n.github.io/id-scanner/icons/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://4hus4n.github.io/id-scanner/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://4hus4n.github.io/id-scanner/icons/og-image.jpg">
 </head>
 <body>
-<title>CardFlat</title>
+<title>IdScanner</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="theme-color" content="#0d6b58">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -245,7 +264,7 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
 
 <header class="appbar">
   <div class="appbar-in">
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div style="min-width:0"><h1>CardFlat</h1><div class="tag">Photo of a card in, flat scan out</div></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div style="min-width:0"><h1>IdScanner</h1><div class="tag">Photo of a card in, flat scan out</div></div></div>
     <span class="cvstat loading" id="cvstat">Loading finder</span>
   </div>
   <div class="holo" aria-hidden="true"></div>
@@ -269,7 +288,7 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
   <defs><linearGradient id="lbs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#41c3a2" stop-opacity="0"/><stop offset="1" stop-color="#41c3a2" stop-opacity=".45"/></linearGradient></defs>
   <path class="lg-corner" d="M4 18V4h14M102 4h14v14M116 66v14h-14M18 80H4V66"/>
 </svg>
-  <h2 aria-label="CardFlat"><span aria-hidden="true" style="animation-delay:0.25s">C</span><span aria-hidden="true" style="animation-delay:0.31s">a</span><span aria-hidden="true" style="animation-delay:0.37s">r</span><span aria-hidden="true" style="animation-delay:0.43s">d</span><span aria-hidden="true" style="animation-delay:0.49s">F</span><span aria-hidden="true" style="animation-delay:0.55s">l</span><span aria-hidden="true" style="animation-delay:0.61s">a</span><span aria-hidden="true" style="animation-delay:0.67s">t</span></h2>
+  <h2 aria-label="IdScanner"><span aria-hidden="true" style="animation-delay:0.25s">I</span><span aria-hidden="true" style="animation-delay:0.31s">d</span><span aria-hidden="true" style="animation-delay:0.37s">S</span><span aria-hidden="true" style="animation-delay:0.43s">c</span><span aria-hidden="true" style="animation-delay:0.49s">a</span><span aria-hidden="true" style="animation-delay:0.55s">n</span><span aria-hidden="true" style="animation-delay:0.61s">n</span><span aria-hidden="true" style="animation-delay:0.67s">e</span><span aria-hidden="true" style="animation-delay:0.73s">r</span></h2>
   <div class="sub">Photo of a card in, flat scan out</div>
   <div class="credit-s">crafted by <span class="cc">clickandcraft</span> in Milandhoo</div>
 </div>
@@ -295,7 +314,7 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
   <path class="lg-corner" d="M4 18V4h14M102 4h14v14M116 66v14h-14M18 80H4V66"/>
 </svg>
         <h2>Scan an ID card</h2>
-        <p>Take a photo of the front, then the back. CardFlat finds the card, straightens it and saves it at real size.</p>
+        <p>Take a photo of the front, then the back. IdScanner finds the card, straightens it and saves it at real size.</p>
         <div class="acts">
           <button class="btn primary" id="heroCam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take photo</button>
           <button class="btn" id="heroGal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/></svg>Choose from gallery</button>

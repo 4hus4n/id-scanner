@@ -1,4 +1,6 @@
-# CardFlat — ID card scanner
+# IdScanner
+
+![IdScanner](icons/og-image.jpg)
 
 Web app that turns phone photos of an ID card (front and back) into a clean, flat scan.
 
