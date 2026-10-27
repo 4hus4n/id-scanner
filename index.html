@@ -135,11 +135,16 @@ body:not(.has-cards) .credit{margin-top:8px}
 .scene-fit>.scene,.scene-fit>.sc-cap{position:absolute;left:50%;width:288px;max-width:none;margin:0;transform-origin:top center;transform:translateX(-50%) scale(var(--sc))}
 .scene-fit>.scene{top:0}
 .scene-fit>.sc-cap{top:calc(220px * var(--sc) + 2px);transform:translateX(-50%)}
-@media (min-height:700px){.scene-fit{--sc:.66}}
+@media (min-height:700px){.scene-fit{--sc:.62}}
 @media (min-height:780px){.scene-fit{--sc:.76}}
 @media (min-height:860px){.scene-fit{--sc:.9}}
 @media (min-height:960px){.scene-fit{--sc:1}}
-.hero{gap:10px;padding:4px 0}
+.hero{gap:clamp(10px,2vh,22px);padding:4px 0}
+.hero h2{margin-top:clamp(0px,1vh,10px)}
+.hero p{margin-top:calc(-1 * clamp(2px,1vh,10px))}
+.hero .acts{margin-top:clamp(4px,1.4vh,14px)!important;gap:clamp(8px,1.3vh,12px)!important}
+.steps{margin-top:clamp(2px,1vh,10px)!important}
+.hero-foot{margin-top:clamp(0px,.6vh,6px)}
 .hero h2{font-size:clamp(1.45rem,6.4vw,2rem)}
 .hero p{font-size:.92rem;line-height:1.4}
 .hero .acts{margin-top:4px;gap:8px}
