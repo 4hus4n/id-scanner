@@ -126,6 +126,29 @@ h1{font-family:var(--f-display);font-size:1.25rem;letter-spacing:-.01em;margin:0
 .steps div:nth-child(2){animation-delay:.08s}.steps div:nth-child(3){animation-delay:.16s}
 .steps b{font-family:var(--f-display);color:var(--ink);font-size:.86rem}
 .steps svg{width:22px;height:22px;color:var(--accent)}
+.hero-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:2px 14px}
+/* start screen fits one screen: scene scales with the screen height */
+body:not(.has-cards) .wrap{min-height:calc(100dvh - 64px - env(safe-area-inset-top,0px));display:flex;flex-direction:column;padding-block:6px calc(10px + env(safe-area-inset-bottom,0px))}
+body:not(.has-cards) .grid{flex:1;align-content:center}
+body:not(.has-cards) .credit{margin-top:8px}
+.scene-fit{--sc:.56;width:calc(288px * var(--sc));height:calc(242px * var(--sc));position:relative;flex:none}
+.scene-fit>.scene,.scene-fit>.sc-cap{position:absolute;left:50%;width:288px;margin:0;transform-origin:top center;transform:translateX(-50%) scale(var(--sc))}
+.scene-fit>.scene{top:0}
+.scene-fit>.sc-cap{top:calc(220px * var(--sc) + 2px);transform:translateX(-50%)}
+@media (min-height:700px){.scene-fit{--sc:.66}}
+@media (min-height:780px){.scene-fit{--sc:.76}}
+@media (min-height:860px){.scene-fit{--sc:.9}}
+@media (min-height:960px){.scene-fit{--sc:1}}
+.hero{gap:10px;padding:4px 0}
+.hero h2{font-size:clamp(1.45rem,6.4vw,2rem)}
+.hero p{font-size:.92rem;line-height:1.4}
+.hero .acts{margin-top:4px;gap:8px}
+.hero .acts .btn{min-height:50px}
+.steps{margin-top:2px;gap:6px}
+.steps div{padding:7px 4px;gap:3px;font-size:.72rem}
+.steps svg{width:19px;height:19px}
+.hero .sample{padding:6px 4px}
+@media (max-height:640px){.steps{display:none}.hero p{font-size:.86rem}}
 body:not(.has-cards) #out,body:not(.has-cards) .mbar,body:not(.has-cards) #drop{display:none}
 body.has-cards .hero{display:none}
 body:not(.has-cards) .grid{grid-template-columns:minmax(0,1fr)}
@@ -381,7 +404,7 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
   <div class="grid">
     <section aria-label="Cards">
       <div class="hero" id="hero">
-        <div class="scene" aria-hidden="true">
+        <div class="scene-fit"><div class="scene" aria-hidden="true">
   <div class="sc-page"><i style="top:21px"></i><i style="top:75px"></i></div>
   <div class="sc-ph a"><div class="hand"></div><div class="sc-beam"></div><div class="sc-up"><i></i></div></div>
   <div class="sc-ph b"><div class="hand"></div><div class="sc-beam"></div><div class="sc-up"><i></i></div></div>
@@ -391,7 +414,7 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
   <div class="sc-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 11l6 6 6-6"/><path d="M5 20h14"/></svg></div>
   <div class="sc-saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>id-card.pdf saved</div>
 </div>
-<div class="sc-cap" aria-hidden="true"><span>Uploading 2 photos…</span><span>Finding the cards…</span><span>Straightening onto the page…</span><span>Saving id-card.pdf</span></div>
+<div class="sc-cap" aria-hidden="true"><span>Uploading 2 photos…</span><span>Finding the cards…</span><span>Straightening onto the page…</span><span>Saving id-card.pdf</span></div></div>
         <h2>Scan an ID card</h2>
         <p>Take a photo of the front, then the back. IdScanner finds the card, straightens it and saves it at real size.</p>
         <div class="acts">
@@ -403,8 +426,8 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
           <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg><b>2 · Straighten</b>automatic</div>
           <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><b>3 · Save</b>PDF or image</div>
         </div>
-        <button class="sample" id="trySample">Try it with a sample card</button>
-        <div class="tiny"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Photos stay on this device</div>
+        <div class="hero-foot"><button class="sample" id="trySample">Try it with a sample card</button>
+        <div class="tiny"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Photos stay on this device</div></div>
       </div>
       <div class="drop" id="drop">
         <div class="drop-actions">
