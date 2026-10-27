@@ -7,155 +7,228 @@
 <body>
 <title>CardFlat</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#0d6b58">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: two-pane workbench — scanned cards on the left, output sheet + export on the right; one column with a sticky export bar on phones */
+/* Layout: mobile-first single column (cards, then output) with a thumb-reach bottom bar; from 960px a two-pane workbench with a sticky output panel */
 :root{
   --bg:#eaefee; --surface:#ffffff; --sunk:#dfe6e4; --ink:#13201e; --muted:#5a6b67; --line:#cdd7d4;
-  --accent:#0d6b58; --accent-ink:#ffffff; --accent-soft:#d3ebe4; --warn:#a4570b; --warn-soft:#fbe9d4; --danger:#b3261e;
-  --sheet:#c9d2cf; --handle:#ffffff;
+  --accent:#0d6b58; --accent-ink:#ffffff; --accent-soft:#d3ebe4; --warn:#9a5208; --warn-soft:#fbe9d4;
+  --sheet:#c9d2cf; --shadow:0 1px 2px rgba(10,30,25,.12),0 6px 20px rgba(10,30,25,.10);
   --holo:linear-gradient(90deg,#7fd3ff,#b79bff,#ff9fd2,#ffd88a,#8ff0c0,#7fd3ff);
   --f-display:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif;
   --f-body:"Instrument Sans","Segoe UI",system-ui,-apple-system,sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
-  --r:10px;
+  --r:14px; --ease:cubic-bezier(.2,.8,.2,1); --spring:cubic-bezier(.34,1.56,.64,1);
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0e1513; --surface:#16201e; --sunk:#1d2a27; --ink:#e4ece9; --muted:#93a59f; --line:#2b3a36;
-  --accent:#41c3a2; --accent-ink:#06231c; --accent-soft:#173a32; --warn:#f0a75a; --warn-soft:#3a2a17; --danger:#ff8a80;
-  --sheet:#0a100f; --handle:#ffffff; color-scheme:dark}}
+  --bg:#0e1513; --surface:#16201e; --sunk:#1f2b28; --ink:#e4ece9; --muted:#93a59f; --line:#2b3a36;
+  --accent:#41c3a2; --accent-ink:#06231c; --accent-soft:#173a32; --warn:#f0a75a; --warn-soft:#3a2a17;
+  --sheet:#0a100f; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0e1513; --surface:#16201e; --sunk:#1d2a27; --ink:#e4ece9; --muted:#93a59f; --line:#2b3a36;
-  --accent:#41c3a2; --accent-ink:#06231c; --accent-soft:#173a32; --warn:#f0a75a; --warn-soft:#3a2a17; --danger:#ff8a80;
-  --sheet:#0a100f; --handle:#ffffff; color-scheme:dark}
+  --bg:#0e1513; --surface:#16201e; --sunk:#1f2b28; --ink:#e4ece9; --muted:#93a59f; --line:#2b3a36;
+  --accent:#41c3a2; --accent-ink:#06231c; --accent-soft:#173a32; --warn:#f0a75a; --warn-soft:#3a2a17;
+  --sheet:#0a100f; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
+html{-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 96px}
-header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:18px 14px}
-.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
-.brand-mark{width:34px;height:22px;border-radius:4px;background:var(--surface);border:1.5px solid var(--ink);position:relative;overflow:hidden;flex:none}
-.brand-mark::after{content:"";position:absolute;left:4px;right:12px;top:7px;height:3px;background:var(--holo);border-radius:2px}
-.brand-mark::before{content:"";position:absolute;right:4px;top:4px;width:6px;height:9px;border-radius:2px;background:var(--ink);opacity:.8}
-h1{font-family:var(--f-display);font-size:1.45rem;letter-spacing:-.01em;margin:0;line-height:1}
-.tag{font-size:.82rem;color:var(--muted)}
-.cvstat{font-family:var(--f-mono);font-size:.72rem;padding:4px 9px;border-radius:99px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+
+/* ---------- app bar ---------- */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:31;background:var(--surface)}
+.appbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.appbar-in{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:10px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto;min-width:0}
+.brand-mark{width:32px;height:21px;border-radius:4px;background:var(--surface);border:1.5px solid var(--ink);position:relative;overflow:hidden;flex:none}
+.brand-mark::after{content:"";position:absolute;left:4px;right:11px;top:7px;height:3px;background:var(--holo);background-size:200% 100%;border-radius:2px;animation:holo 6s linear infinite}
+.brand-mark::before{content:"";position:absolute;right:4px;top:4px;width:5px;height:8px;border-radius:2px;background:var(--ink);opacity:.85}
+h1{font-family:var(--f-display);font-size:1.25rem;letter-spacing:-.01em;margin:0;line-height:1}
+.tag{font-size:.75rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cvstat{font-family:var(--f-mono);font-size:.68rem;padding:4px 9px;border-radius:99px;background:var(--sunk);color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:6px;transition:background .3s,color .3s}
+.cvstat::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.7}
+.cvstat.loading::before{animation:blink 1s ease-in-out infinite}
 .cvstat.ok{background:var(--accent-soft);color:var(--accent)}
 .cvstat.bad{background:var(--warn-soft);color:var(--warn)}
-.holo{height:3px;background:var(--holo);border-radius:2px;opacity:.85;margin-bottom:18px}
-.grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:22px;align-items:start}
-@media (max-width:920px){.grid{grid-template-columns:minmax(0,1fr)}}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 13px;cursor:pointer;font-weight:500;font-size:.9rem;min-height:38px;transition:background .15s,border-color .15s}
+.holo{height:2px;background:var(--holo);background-size:200% 100%;animation:holo 8s linear infinite;opacity:.9}
+
+/* ---------- layout ---------- */
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
+.grid{display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+@media (min-width:960px){
+  .grid{grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
+  aside.out{position:sticky;top:calc(env(safe-area-inset-top,0px) + 72px)}
+  .wrap{padding-block:22px 40px}
+}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:500;font-size:.92rem;min-height:44px;transition:background .15s,border-color .15s,transform .15s var(--spring),box-shadow .2s;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 .btn:hover{border-color:var(--muted)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:active{transform:scale(.96)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);box-shadow:0 2px 10px color-mix(in srgb,var(--accent) 35%,transparent)}
 .btn.primary:hover{filter:brightness(1.07)}
 .btn.ghost{background:transparent;border-color:transparent}
 .btn.ghost:hover{background:var(--sunk)}
-.btn.icon{padding:7px;min-width:38px}
-.btn[disabled]{opacity:.45;cursor:not-allowed}
-.btn svg{width:18px;height:18px;flex:none}
-.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:var(--surface);transition:border-color .15s,background .15s}
-.drop.over{border-color:var(--accent);background:var(--accent-soft)}
-.drop p{margin:0;color:var(--muted);font-size:.88rem;flex:1 1 220px;min-width:0}
+.btn.icon{padding:0;width:44px}
+.btn[disabled]{opacity:.4;cursor:not-allowed;transform:none}
+.btn svg{width:20px;height:20px;flex:none}
+
+/* ---------- add photos ---------- */
+.drop{position:relative;border:1.5px dashed var(--line);border-radius:var(--r);padding:18px;display:grid;gap:14px;background:var(--surface);transition:border-color .2s,background .2s,transform .2s var(--ease)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft);transform:scale(1.01)}
+.drop-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.drop-actions .btn{min-height:52px;font-size:1rem}
+.drop p{margin:0;color:var(--muted);font-size:.88rem}
 .drop strong{color:var(--ink);font-weight:600}
-.pages{display:flex;flex-direction:column;gap:14px;margin-top:14px}
-.page{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-.page-main{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:0}
-@media (max-width:640px){.page-main{grid-template-columns:minmax(0,1fr)}}
-.result{background:var(--sheet);display:flex;align-items:center;justify-content:center;padding:16px;min-height:170px;position:relative;cursor:pointer}
-.result canvas{max-width:100%;max-height:300px;display:block;box-shadow:0 1px 2px rgba(0,0,0,.18),0 8px 22px rgba(0,0,0,.14)}
-.result .busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:.78rem;color:var(--ink);background:color-mix(in srgb,var(--sheet) 70%,transparent)}
-.side{padding:14px 14px 12px;display:flex;flex-direction:column;gap:10px;min-width:0;border-left:1px solid var(--line)}
-@media (max-width:640px){.side{border-left:0;border-top:1px solid var(--line)}}
+@media (min-width:600px){.drop{grid-template-columns:auto 1fr;align-items:center}.drop-actions{grid-template-columns:auto auto}}
+
+/* ---------- card list ---------- */
+.pages{display:flex;flex-direction:column;gap:16px;margin-top:16px}
+.page{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);animation:enter .5s var(--ease) both}
+.page.leaving{animation:leave .28s var(--ease) both}
+.page-main{display:grid;grid-template-columns:minmax(0,1fr)}
+@media (min-width:700px){.page-main{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}}
+.result{background:var(--sheet);display:flex;align-items:center;justify-content:center;padding:18px 16px;min-height:190px;position:relative;cursor:pointer;overflow:hidden}
+.result canvas{max-width:100%;max-height:320px;display:block;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,.2),0 10px 26px rgba(0,0,0,.18)}
+.result.settle canvas{animation:settle .6s var(--spring) both}
+.result .scan{position:absolute;inset:0;pointer-events:none;display:flex;align-items:flex-end;justify-content:center;padding:12px}
+.result .scan::before{content:"";position:absolute;left:0;right:0;height:38%;top:-40%;background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--accent) 22%,transparent) 70%,color-mix(in srgb,var(--accent) 70%,#fff) 98%,transparent);animation:sweep 1.4s var(--ease) infinite}
+.result .scan span{position:relative;font-family:var(--f-mono);font-size:.74rem;background:var(--surface);color:var(--ink);padding:4px 10px;border-radius:99px;box-shadow:var(--shadow)}
+.result .tap{position:absolute;right:10px;bottom:10px;font-size:.72rem;font-weight:600;background:color-mix(in srgb,var(--surface) 90%,transparent);padding:4px 9px;border-radius:99px;color:var(--muted);display:flex;gap:5px;align-items:center}
+.result .tap svg{width:13px;height:13px}
+.side{padding:14px 14px 12px;display:flex;flex-direction:column;gap:12px;min-width:0;border-top:1px solid var(--line)}
+@media (min-width:700px){.side{border-top:0;border-left:1px solid var(--line)}}
 .namerow{display:flex;align-items:center;gap:8px}
-.namerow input{flex:1;min-width:0;border:1px solid transparent;background:transparent;font-family:var(--f-display);font-weight:600;font-size:1.1rem;padding:3px 6px;margin-left:-6px;border-radius:6px}
+.namerow input{flex:1;min-width:0;border:1px solid transparent;background:transparent;font-family:var(--f-display);font-weight:600;font-size:1.15rem;padding:4px 6px;margin-left:-6px;border-radius:8px}
 .namerow input:hover,.namerow input:focus{border-color:var(--line);background:var(--bg)}
-.chip{font-size:.72rem;font-weight:600;padding:3px 8px;border-radius:99px;white-space:nowrap;background:var(--sunk);color:var(--muted)}
+.chip{font-size:.72rem;font-weight:600;padding:4px 9px;border-radius:99px;white-space:nowrap;background:var(--sunk);color:var(--muted);transition:background .3s,color .3s}
 .chip.auto{background:var(--accent-soft);color:var(--accent)}
 .chip.warn{background:var(--warn-soft);color:var(--warn)}
 .chip.sample{background:var(--ink);color:var(--surface)}
-.meta{font-family:var(--f-mono);font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
-.tools{display:flex;flex-wrap:wrap;gap:4px}
-.tools .sep{width:1px;background:var(--line);margin:4px 3px}
+.chip.pop{animation:pop .45s var(--spring)}
+.meta{font-family:var(--f-mono);font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:pre-line}
 .thumbsrc{display:flex;gap:10px;align-items:center}
-.thumbsrc canvas{width:54px;height:54px;object-fit:cover;border-radius:6px;border:1px solid var(--line);flex:none;background:var(--sunk)}
+.thumbsrc canvas{width:52px;height:52px;border-radius:8px;border:1px solid var(--line);flex:none;background:var(--sunk)}
+.tools{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.tools .btn{width:100%;min-width:0;padding:0;flex-direction:column;gap:2px;font-size:.66rem;font-weight:600;color:var(--muted);min-height:54px;background:transparent;border-color:transparent}
+.tools .btn:hover{background:var(--sunk)}
+.tools .btn.main{color:var(--accent);background:var(--accent-soft)}
+.tools .btn svg{width:20px;height:20px}
 details.adj{border-top:1px solid var(--line)}
-details.adj>summary{list-style:none;cursor:pointer;padding:10px 14px;font-weight:600;font-size:.88rem;display:flex;align-items:center;gap:8px}
+details.adj>summary{list-style:none;cursor:pointer;padding:12px 14px;font-weight:600;font-size:.92rem;display:flex;align-items:center;gap:8px;min-height:48px}
 details.adj>summary::-webkit-details-marker{display:none}
-details.adj>summary .car{transition:transform .15s;width:14px;height:14px}
+details.adj>summary .car{transition:transform .25s var(--ease);width:16px;height:16px;display:flex}
 details.adj[open]>summary .car{transform:rotate(90deg)}
-details.adj>summary .changed{font-weight:500;color:var(--accent);font-size:.78rem}
-.adj-body{padding:4px 14px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 22px}
-.ctl{display:flex;flex-direction:column;gap:5px;min-width:0}
-.ctl label,.lbl{font-size:.74rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+details.adj>summary .changed{font-weight:500;color:var(--accent);font-size:.78rem;margin-left:auto}
+details.adj[open] .adj-body{animation:reveal .35s var(--ease)}
+.adj-body{padding:2px 14px 16px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px 22px}
+@media (min-width:560px){.adj-body{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ctl{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ctl label,.lbl{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
 .ctl label output{font-family:var(--f-mono);font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink);font-variant-numeric:tabular-nums}
-input[type=range]{width:100%;accent-color:var(--accent);height:22px;margin:0}
-.seg{display:flex;background:var(--sunk);border-radius:8px;padding:3px;gap:2px;flex-wrap:wrap}
-.seg button{flex:1;border:0;background:transparent;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:.82rem;font-weight:500;color:var(--muted);white-space:nowrap}
-.seg button[aria-pressed=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.adj-actions{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
-.check{display:flex;align-items:center;gap:8px;font-size:.88rem;cursor:pointer}
-.check input{accent-color:var(--accent);width:17px;height:17px}
-aside.out{position:sticky;top:12px;display:flex;flex-direction:column;gap:14px}
-@media (max-width:920px){aside.out{position:static}}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px}
-.panel h2{font-family:var(--f-display);font-size:1.05rem;margin:0;display:flex;align-items:baseline;justify-content:space-between;gap:8px}
-.panel h2 small{font-family:var(--f-mono);font-weight:400;font-size:.72rem;color:var(--muted)}
-.preview{background:var(--sheet);border-radius:8px;padding:14px;display:flex;align-items:center;justify-content:center;min-height:180px}
-.preview canvas{max-width:100%;max-height:420px;display:block;box-shadow:0 1px 2px rgba(0,0,0,.2),0 10px 26px rgba(0,0,0,.16)}
-select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;min-height:38px}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input[type=range]{width:100%;accent-color:var(--accent);height:28px;margin:0}
+.seg{display:flex;background:var(--sunk);border-radius:10px;padding:3px;gap:2px}
+.seg button{flex:1;border:0;background:transparent;padding:8px 6px;border-radius:8px;cursor:pointer;font-size:.84rem;font-weight:500;color:var(--muted);white-space:nowrap;min-height:38px;transition:background .2s,color .2s,box-shadow .2s}
+.seg button[aria-pressed=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.seg.wrap4{display:grid;grid-template-columns:repeat(2,1fr)}
+@media (min-width:420px){.seg.wrap4{grid-template-columns:repeat(4,1fr)}}
+.row{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap}
+.span2{grid-column:1/-1}
+.adj-actions{display:flex;gap:8px;flex-wrap:wrap}
+.check{display:flex;align-items:center;gap:9px;font-size:.92rem;cursor:pointer;min-height:36px}
+.check input{accent-color:var(--accent);width:19px;height:19px}
+
+/* ---------- output panel ---------- */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:16px;box-shadow:var(--shadow);scroll-margin-top:80px}
+.panel h2{font-family:var(--f-display);font-size:1.15rem;margin:0;display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.panel h2 small{font-family:var(--f-mono);font-weight:400;font-size:.7rem;color:var(--muted)}
+.preview{background:var(--sheet);border-radius:10px;padding:14px;display:flex;align-items:center;justify-content:center;min-height:180px;overflow:hidden}
+.preview canvas{max-width:100%;max-height:440px;display:block;box-shadow:0 1px 2px rgba(0,0,0,.2),0 10px 26px rgba(0,0,0,.16);transition:opacity .2s}
+.preview.fresh canvas{animation:fadeIn .35s var(--ease)}
+select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 11px;min-height:44px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .two>*{min-width:0}
-.swatch{width:38px;height:38px;border-radius:8px;border:1px solid var(--line);padding:0;background:none;cursor:pointer}
+.swatch{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);padding:0;background:none;cursor:pointer;flex:none}
 .fineprint{font-size:.78rem;color:var(--muted);margin:0}
+.export-main{min-height:52px;font-size:1.02rem}
+@media (max-width:959px){.export-main{display:none}}
 .credit{margin-top:28px;font-size:.78rem;color:var(--muted);text-align:center}
-.mbar{display:none}
-@media (max-width:920px){
-  .mbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;gap:10px;align-items:center;background:var(--surface);border-top:1px solid var(--line);padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-  .mbar .meta{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:8px;font-size:.88rem;z-index:60;max-width:calc(100% - 32px);box-shadow:0 8px 24px rgba(0,0,0,.25)}
-.empty{padding:30px 16px;text-align:center;color:var(--muted);font-size:.9rem}
-/* editor */
-.ed{position:fixed;inset:0;z-index:50;background:#0b0f0e;display:flex;flex-direction:column;color:#e9efed;padding-top:env(safe-area-inset-top,0px)}
-.ed-top{display:flex;align-items:center;gap:8px;padding:10px max(14px,env(safe-area-inset-right,0px)) 10px max(14px,env(safe-area-inset-left,0px));flex-wrap:wrap}
-.ed-top h3{margin:0 auto 0 0;font-family:var(--f-display);font-size:1.05rem}
+
+/* ---------- bottom bar (phones) ---------- */
+.mbar{position:fixed;left:0;right:0;bottom:0;z-index:25;display:flex;gap:10px;align-items:center;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));animation:rise .5s var(--ease) both}
+.mbar .meta{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbar .btn{min-height:48px}
+.mbar #mExport{padding-inline:20px}
+@media (min-width:960px){.mbar{display:none}}
+
+.toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:11px 16px;border-radius:12px;font-size:.9rem;z-index:60;max-width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.28);animation:toastIn .35s var(--spring) both}
+.toast.out{animation:toastOut .25s var(--ease) both}
+@media (min-width:960px){.toast{bottom:24px}}
+.empty{padding:34px 16px;text-align:center;color:var(--muted);font-size:.92rem;animation:enter .4s var(--ease) both}
+
+/* ---------- corner editor ---------- */
+.ed{position:fixed;inset:0;z-index:50;background:#0b0f0e;display:flex;flex-direction:column;color:#e9efed;padding-top:env(safe-area-inset-top,0px);animation:edIn .32s var(--ease) both}
+.ed.closing{animation:edOut .22s var(--ease) both}
+.ed-top,.ed-bottom{display:flex;align-items:center;gap:8px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.ed-top{padding-block:8px}
+.ed-top h3{margin:0;flex:1;text-align:center;font-family:var(--f-display);font-size:1.02rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ed-bottom{justify-content:center;padding-top:8px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));flex-wrap:wrap}
 .ed .btn{background:#1b2422;border-color:#2c3a37;color:#e9efed}
-.ed .btn.primary{background:#41c3a2;border-color:#41c3a2;color:#06231c}
+.ed .btn.ghost{background:transparent;border-color:transparent}
+.ed .btn.primary{background:#41c3a2;border-color:#41c3a2;color:#06231c;box-shadow:none}
 .ed-stage{flex:1;min-height:0;position:relative;touch-action:none}
 .ed-stage canvas{position:absolute;inset:0;width:100%;height:100%}
-.ed-hint{text-align:center;font-size:.8rem;color:#9fb1ac;padding:6px 14px calc(10px + env(safe-area-inset-bottom,0px))}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.ed-hint{text-align:center;font-size:.8rem;color:#9fb1ac;padding:4px 14px 0}
+@media (hover:none){.kbd-hint{display:none}}
+
+@keyframes enter{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes leave{to{opacity:0;transform:translateX(30px) scale(.97)}}
+@keyframes settle{0%{opacity:0;transform:perspective(700px) rotateX(10deg) scale(.92)}100%{opacity:1;transform:none}}
+@keyframes sweep{0%{top:-40%}100%{top:100%}}
+@keyframes pop{0%{transform:scale(.7)}100%{transform:scale(1)}}
+@keyframes reveal{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:.35}to{opacity:1}}
+@keyframes rise{from{transform:translateY(100%)}to{transform:none}}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,16px) scale(.95)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes toastOut{to{opacity:0;transform:translate(-50%,10px)}}
+@keyframes edIn{from{opacity:0;transform:scale(1.03)}to{opacity:1;transform:none}}
+@keyframes edOut{to{opacity:0;transform:scale(1.02)}}
+@keyframes holo{to{background-position:200% 0}}
+@keyframes blink{50%{opacity:.15}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 
-<div class="wrap">
-  <header class="top">
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div><h1>CardFlat</h1><div class="tag">Photo of a card in, flat scan out</div></div></div>
-    <span class="cvstat" id="cvstat">Edge finder loading…</span>
-  </header>
+<header class="appbar">
+  <div class="appbar-in">
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div style="min-width:0"><h1>CardFlat</h1><div class="tag">Photo of a card in, flat scan out</div></div></div>
+    <span class="cvstat loading" id="cvstat">Loading finder</span>
+  </div>
   <div class="holo" aria-hidden="true"></div>
+</header>
 
+<div class="wrap">
   <div class="grid">
     <section aria-label="Cards">
       <div class="drop" id="drop">
-        <button class="btn primary" id="addBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add photos</button>
-        <p><strong>Front, back, or both.</strong> Drop or paste photos here. Each card is found, straightened and cropped automatically. Photos stay on this device.</p>
+        <div class="drop-actions">
+          <button class="btn primary" id="camBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take photo</button>
+          <button class="btn" id="addBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/></svg>Gallery</button>
+        </div>
+        <p><strong>Front, back, or both.</strong> Each card is found, straightened and cropped automatically. You can also drop or paste photos. Nothing is uploaded.</p>
         <input type="file" id="file" accept="image/*" multiple hidden>
+        <input type="file" id="cam" accept="image/*" capture="environment" hidden>
       </div>
       <div class="pages" id="pages"></div>
     </section>
 
     <aside class="out" id="out">
-      <div class="panel">
+      <div class="panel" id="outPanel">
         <h2>Output <small id="dimLabel"></small></h2>
-        <div class="preview"><canvas id="preview" width="10" height="10"></canvas></div>
+        <div class="preview" id="previewBox"><canvas id="preview" width="10" height="10"></canvas></div>
         <div class="ctl"><span class="lbl">Layout</span>
-          <div class="seg" id="layoutSeg" role="group" aria-label="Layout">
+          <div class="seg wrap4" id="layoutSeg" role="group" aria-label="Layout">
             <button data-v="stack">Stacked</button><button data-v="side">Side by side</button><button data-v="print">Print page</button><button data-v="separate">Separate</button>
           </div>
         </div>
@@ -173,8 +246,8 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
             <select id="fmt"><option value="pdf">PDF</option><option value="png">PNG image</option><option value="jpg">JPG image</option></select></div>
         </div>
         <div class="two" id="customRow" hidden>
-          <div class="ctl"><label for="cw">Width mm</label><input type="number" id="cw" min="10" max="600" step="0.1" value="85.6"></div>
-          <div class="ctl"><label for="ch">Height mm</label><input type="number" id="ch" min="10" max="600" step="0.1" value="54"></div>
+          <div class="ctl"><label for="cw">Width mm</label><input type="number" id="cw" min="10" max="600" step="0.1" value="85.6" inputmode="decimal"></div>
+          <div class="ctl"><label for="ch">Height mm</label><input type="number" id="ch" min="10" max="600" step="0.1" value="54" inputmode="decimal"></div>
         </div>
         <div class="two">
           <div class="ctl"><label for="dpi">Resolution</label>
@@ -190,65 +263,87 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
           <label class="check"><input type="checkbox" id="round" checked> Rounded corners</label>
           <label class="check" id="guidesCtl"><input type="checkbox" id="guides" checked> Cut lines</label>
         </div>
-        <div class="row">
-          <span class="lbl" style="margin-right:4px">Background</span>
-          <div class="seg" id="bgSeg" style="flex:1"><button data-v="white">White</button><button data-v="transparent">None</button><button data-v="color">Color</button></div>
-          <input type="color" class="swatch" id="bgColor" value="#e8eceb" aria-label="Background color">
+        <div class="ctl"><span class="lbl">Background</span>
+          <div class="row" style="flex-wrap:nowrap">
+            <div class="seg" id="bgSeg" style="flex:1"><button data-v="white">White</button><button data-v="transparent">None</button><button data-v="color">Colour</button></div>
+            <input type="color" class="swatch" id="bgColor" value="#e8eceb" aria-label="Background colour">
+          </div>
         </div>
         <div class="ctl" id="qualCtl"><label for="qual">JPG quality <output id="qualO"></output></label><input type="range" id="qual" min="50" max="100" value="92"></div>
-        <div class="ctl"><label for="fname">File name</label><input type="text" class="f" id="fname" value="id-card" spellcheck="false"></div>
-        <button class="btn primary" id="exportBtn" style="min-height:46px;font-size:1rem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span id="exportLbl">Save PDF</span></button>
-        <p class="fineprint">Everything runs in your browser. Nothing is uploaded.</p>
+        <div class="ctl"><label for="fname">File name</label><input type="text" class="f" id="fname" value="id-card" spellcheck="false" autocomplete="off"></div>
+        <button class="btn primary export-main" id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span id="exportLbl">Save PDF</span></button>
+        <p class="fineprint">Everything runs in your browser. Photos never leave this device.</p>
       </div>
     </aside>
   </div>
   <div class="credit">crafted by clickandcraft in Milandhoo</div>
 </div>
 
-<div class="mbar"><span class="meta" id="mbarMeta"></span><button class="btn primary" id="mExport">Save</button></div>
+<div class="mbar">
+  <button class="btn ghost icon" id="mOut" aria-label="Output settings" title="Output settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+  <span class="meta" id="mbarMeta"></span>
+  <button class="btn primary" id="mExport">Save</button>
+</div>
 
 <div class="ed" id="ed" hidden role="dialog" aria-modal="true" aria-label="Adjust corners">
   <div class="ed-top">
-    <h3 id="edTitle">Adjust corners</h3>
-    <button class="btn" id="edAuto">Auto-detect</button>
-    <button class="btn" id="edFull">Whole photo</button>
-    <button class="btn" id="edCancel">Cancel</button>
+    <button class="btn ghost" id="edCancel">Cancel</button>
+    <h3 id="edTitle">Corners</h3>
     <button class="btn primary" id="edApply">Apply</button>
   </div>
   <div class="ed-stage" id="edStage"><canvas id="edCanvas"></canvas></div>
-  <div class="ed-hint">Drag the corners onto the card's edges. Drag a side's middle dot to move the whole side. Arrow keys nudge the selected point.</div>
+  <div class="ed-hint">Drag corners onto the card's edges. Middle dots move a whole side.<span class="kbd-hint"> Arrow keys nudge the selected point.</span></div>
+  <div class="ed-bottom">
+    <button class="btn" id="edAuto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><path d="M9 12l2 2 4-4"/></svg>Auto-detect</button>
+    <button class="btn" id="edFull"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/></svg>Whole photo</button>
+    <button class="btn" id="edReset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6h6"/><path d="M4.5 10A8 8 0 1 1 6 16.5"/></svg>Undo changes</button>
+  </div>
 </div>
 
 <script>
 // ===== DETECT START =====
+// Card finder: many candidate quads (edges, colour masks, straight lines, card-shape extension),
+// each snapped to the strongest nearby straight edges, then ranked by edge support, contrast
+// across the edge, card aspect ratio (85.6 × 54 mm) and size.
 const CARD_AR = 85.6 / 54;
+const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 function orderQuad(p) {
   const cx = (p[0][0] + p[1][0] + p[2][0] + p[3][0]) / 4, cy = (p[0][1] + p[1][1] + p[2][1] + p[3][1]) / 4;
   const s = p.slice().sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));
   let i = 0, m = Infinity;
   s.forEach((q, k) => { if (q[0] + q[1] < m) { m = q[0] + q[1]; i = k; } });
-  return [0, 1, 2, 3].map(k => s[(i + k) % 4]);
+  return [0, 1, 2, 3].map(k => s[(i + k) % 4].slice());
 }
 function polyArea(q) { let a = 0; for (let i = 0; i < q.length; i++) { const j = (i + 1) % q.length; a += q[i][0] * q[j][1] - q[j][0] * q[i][1]; } return Math.abs(a) / 2; }
-const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-function scoreQuad(q, ca, W, H) {
+function sides(q) { return [0, 1, 2, 3].map(i => dist2(q[i], q[(i + 1) % 4])); }
+function quadAR(q) { const sd = sides(q), w = (sd[0] + sd[2]) / 2, h = (sd[1] + sd[3]) / 2; return Math.max(w, h) / Math.max(1e-6, Math.min(w, h)); }
+function isConvex(q) {
+  let sg = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = q[i], b = q[(i + 1) % 4], c = q[(i + 2) % 4];
+    const cr = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+    if (Math.abs(cr) < 1e-9) return false;
+    const s = Math.sign(cr); if (!sg) sg = s; else if (s !== sg) return false;
+  }
+  return true;
+}
+function baseScore(q, ca, W, H) {
   const a = polyArea(q);
-  if (a < 0.03 * W * H || a > 0.95 * W * H) return -1;
-  const sd = [0, 1, 2, 3].map(i => dist(q[i], q[(i + 1) % 4]));
+  if (a < 0.02 * W * H || a > 0.92 * W * H) return -1;
+  const sd = sides(q); if (Math.min(...sd) < 10) return -1;
   const w = (sd[0] + sd[2]) / 2, h = (sd[1] + sd[3]) / 2;
-  const ar = Math.max(w, h) / Math.max(1, Math.min(w, h));
-  const arp = Math.exp(-Math.abs(ar - CARD_AR) * 1.2);
+  const ar = Math.max(w, h) / Math.min(w, h), arp = Math.exp(-Math.abs(ar - CARD_AR) * 1.6);
   const fill = Math.min(1, ca / a);
   let ang = 1;
   for (let i = 0; i < 4; i++) {
     const p = q[i], a1 = q[(i + 3) % 4], b1 = q[(i + 1) % 4];
     const v1 = [a1[0] - p[0], a1[1] - p[1]], v2 = [b1[0] - p[0], b1[1] - p[1]];
-    const n = Math.hypot(...v1) * Math.hypot(...v2); if (!n) return -1;
-    ang *= 1 - Math.abs((v1[0] * v2[0] + v1[1] * v2[1]) / n);
+    ang *= 1 - Math.abs((v1[0] * v2[0] + v1[1] * v2[1]) / (Math.hypot(...v1) * Math.hypot(...v2)));
   }
-  const m = 0.01 * Math.max(W, H);
+  const par = Math.min(sd[0], sd[2]) / Math.max(sd[0], sd[2]) * Math.min(sd[1], sd[3]) / Math.max(sd[1], sd[3]);
+  const m = 0.004 * Math.max(W, H);
   const bt = q.filter(([x, y]) => x < m || y < m || x > W - m || y > H - m).length;
-  return Math.pow(a / (W * H), 0.4) * arp * fill * fill * Math.sqrt(ang) * Math.pow(0.35, bt);
+  return Math.pow(a / (W * H), 0.5) * arp * fill * fill * Math.sqrt(Math.max(0, ang)) * Math.sqrt(par) * Math.pow(0.6, bt);
 }
 function quadFromContour(cv, c) {
   const hull = new cv.Mat(); cv.convexHull(c, hull, false, true);
@@ -263,96 +358,259 @@ function quadFromContour(cv, c) {
   hull.delete();
   return { q: orderQuad(q), ha };
 }
-function percentile(arr, p) {
-  const h = new Uint32Array(256); for (let i = 0; i < arr.length; i++) h[arr[i]]++;
-  const t = arr.length * p / 100; let c = 0; for (let v = 0; v < 256; v++) { c += h[v]; if (c >= t) return v; } return 255;
+function histPercentile(data, p) {
+  const h = new Float64Array(256); for (let i = 0; i < data.length; i++) h[data[i]]++;
+  // numpy-like linear percentile on sorted values
+  const n = data.length, pos = (n - 1) * p / 100, lo = Math.floor(pos), fr = pos - lo;
+  let c = 0, vlo = -1, vhi = -1;
+  for (let v = 0; v < 256; v++) { c += h[v]; if (vlo < 0 && c > lo) vlo = v; if (c > lo + 1) { vhi = v; break; } }
+  if (vhi < 0) vhi = vlo;
+  return vlo + (vhi - vlo) * fr;
 }
-// imageData: RGBA ImageData-like {data,width,height} (already downscaled ~800px)
-function detectCard(cv, img) {
-  const W = img.width, H = img.height;
-  const src = cv.matFromImageData(img);
-  const rgb = new cv.Mat(); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
-  const gray = new cv.Mat(); cv.cvtColor(rgb, gray, cv.COLOR_RGB2GRAY);
-  const hsv = new cv.Mat(); cv.cvtColor(rgb, hsv, cv.COLOR_RGB2HSV);
-  const bl = new cv.Mat(); cv.GaussianBlur(gray, bl, new cv.Size(5, 5), 0);
-  // whiteness map
-  const wmap = new cv.Mat(H, W, cv.CV_8UC1);
-  for (let i = 0, n = W * H; i < n; i++) { const v = hsv.data[i * 3 + 2] - hsv.data[i * 3 + 1] * 1.5; wmap.data[i] = v < 0 ? 0 : v > 255 ? 255 : v; }
-  cv.GaussianBlur(wmap, wmap, new cv.Size(5, 5), 0);
-  const cands = [];
-  const run = (m, mode) => {
-    const cs = new cv.MatVector(), hi = new cv.Mat();
-    cv.findContours(m, cs, hi, mode, cv.CHAIN_APPROX_SIMPLE);
-    const list = []; for (let i = 0; i < cs.size(); i++) { const c = cs.get(i); list.push({ c, a: cv.contourArea(c) }); }
-    list.sort((x, y) => y.a - x.a);
-    list.slice(0, 6).forEach(({ c }) => { if (c.rows < 4) return; const { q, ha } = quadFromContour(cv, c); cands.push({ s: scoreQuad(q, ha, W, H), q }); });
-    list.forEach(({ c }) => c.delete()); cs.delete(); hi.delete();
-  };
-  const k5 = cv.Mat.ones(5, 5, cv.CV_8U);
-  for (const [lo, hiT] of [[30, 90], [60, 160]]) {
-    const e = new cv.Mat(); cv.Canny(bl, e, lo, hiT); cv.morphologyEx(e, e, cv.MORPH_CLOSE, k5);
-    run(e, cv.RETR_LIST); e.delete();
+function kmeans(pts, K) {
+  // deterministic k-means++ on Float32 triples
+  const n = pts.length / 3; let seed = 12345; const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const C = [Array.from(pts.slice(0, 3))]; const d = new Float64Array(n).fill(Infinity);
+  while (C.length < K) {
+    const c = C[C.length - 1]; let tot = 0;
+    for (let i = 0; i < n; i++) { const e = (pts[i * 3] - c[0]) ** 2 + (pts[i * 3 + 1] - c[1]) ** 2 + (pts[i * 3 + 2] - c[2]) ** 2; if (e < d[i]) d[i] = e; tot += d[i]; }
+    let r = rnd() * tot, j = 0; for (; j < n - 1; j++) { r -= d[j]; if (r <= 0) break; }
+    C.push([pts[j * 3], pts[j * 3 + 1], pts[j * 3 + 2]]);
   }
-  const tmp = new cv.Mat(); const otsu = cv.threshold(wmap, tmp, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU); tmp.delete();
-  const ths = [percentile(wmap.data, 75), percentile(wmap.data, 85), percentile(wmap.data, 92), otsu, 200, 225];
-  const ks = [Math.max(3, Math.floor(Math.max(W, H) * 0.03)) | 1, Math.floor(Math.max(W, H) * 0.07) | 1];
-  for (const th of ths) for (const k of ks) {
-    const m = new cv.Mat(); cv.threshold(wmap, m, th - 1, 255, cv.THRESH_BINARY);
-    cv.morphologyEx(m, m, cv.MORPH_OPEN, k5);
-    const ke = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(k, k));
-    cv.morphologyEx(m, m, cv.MORPH_CLOSE, ke); ke.delete();
-    run(m, cv.RETR_EXTERNAL); m.delete();
+  const lab = new Int32Array(n);
+  for (let it = 0; it < 20; it++) {
+    for (let i = 0; i < n; i++) { let bi = 0, bd = Infinity; for (let k = 0; k < K; k++) { const e = (pts[i * 3] - C[k][0]) ** 2 + (pts[i * 3 + 1] - C[k][1]) ** 2 + (pts[i * 3 + 2] - C[k][2]) ** 2; if (e < bd) { bd = e; bi = k; } } lab[i] = bi; }
+    const S = Array.from({ length: K }, () => [0, 0, 0, 0]);
+    for (let i = 0; i < n; i++) { const s = S[lab[i]]; s[0] += pts[i * 3]; s[1] += pts[i * 3 + 1]; s[2] += pts[i * 3 + 2]; s[3]++; }
+    let mv = 0; S.forEach((s, k) => { if (s[3]) { const nc = [s[0] / s[3], s[1] / s[3], s[2] / s[3]]; mv += Math.abs(nc[0] - C[k][0]) + Math.abs(nc[1] - C[k][1]) + Math.abs(nc[2] - C[k][2]); C[k] = nc; } });
+    if (mv < 0.5) break;
   }
-  k5.delete();
-  cands.sort((a, b) => b.s - a.s);
-  const g = new Float32Array(bl.data);
-  [src, rgb, gray, hsv, bl, wmap].forEach(m => m.delete());
-  if (!cands.length || cands[0].s <= 0) return null;
-  return refineQuad(g, W, H, cands[0].q);
+  return C;
 }
-function fitLineTLS(pts) {
-  let mx = 0, my = 0; pts.forEach(p => { mx += p[0]; my += p[1]; }); mx /= pts.length; my /= pts.length;
-  let sxx = 0, syy = 0, sxy = 0; pts.forEach(p => { const dx = p[0] - mx, dy = p[1] - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; });
-  const th = 0.5 * Math.atan2(2 * sxy, sxx - syy); return [Math.cos(th), Math.sin(th), mx, my];
+function lineInter(l1, l2) {
+  const a = -Math.sin(l1[0]), b = Math.cos(l1[0]), c = -Math.sin(l2[0]), d = Math.cos(l2[0]);
+  const det = a * d - b * c; if (Math.abs(det) < 1e-6) return null;
+  return [(l1[1] * d - b * l2[1]) / det, (a * l2[1] - l1[1] * c) / det];
 }
-function refineQuad(g, W, H, q, band = 0.06) {
-  const cx = q.reduce((s, p) => s + p[0], 0) / 4, cy = q.reduce((s, p) => s + p[1], 0) / 4;
-  const diag = dist(q[0], q[2]), d = Math.round(band * diag), lines = [];
-  const at = (x, y) => g[(y | 0) * W + (x | 0)];
+function onBorder(a, b, W, H, big) {
+  const m = 0.012 * big;
+  return (a[0] < m && b[0] < m) || (a[1] < m && b[1] < m) || (a[0] > W - 1 - m && b[0] > W - 1 - m) || (a[1] > H - 1 - m && b[1] > H - 1 - m);
+}
+function snapQuad(gx, gy, W, H, q, big) {
+  const R = Math.floor(0.03 * big), lines = [];
   for (let i = 0; i < 4; i++) {
-    const a = q[i], b = q[(i + 1) % 4]; const L = dist(a, b); const t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
-    let n = [t[1], -t[0]]; if (n[0] * ((a[0] + b[0]) / 2 - cx) + n[1] * ((a[1] + b[1]) / 2 - cy) < 0) n = [-n[0], -n[1]];
-    let pts = [];
-    for (let k = 0; k < 40; k++) {
-      const f = 0.1 + 0.8 * k / 39; const p = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
-      let best = null, bv = 8;
-      for (let s = -d; s <= d; s++) {
-        const xi = p[0] + n[0] * (s - 2), yi = p[1] + n[1] * (s - 2), xo = p[0] + n[0] * (s + 2), yo = p[1] + n[1] * (s + 2);
-        if (xi < 0 || yi < 0 || xo < 0 || yo < 0 || xi >= W || xo >= W || yi >= H || yo >= H) continue;
-        const v = at(xi, yi) - at(xo, yo); if (v > bv) { bv = v; best = [p[0] + n[0] * s, p[1] + n[1] * s]; }
+    const a = q[i], b = q[(i + 1) % 4], mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], L = dist2(a, b), t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+    if (onBorder(a, b, W, H, big)) { lines.push([mid, t]); continue; }
+    let best = -1, bl = null;
+    for (let deg = -3; deg <= 3; deg++) {
+      const an = deg * Math.PI / 180, ca = Math.cos(an), sa = Math.sin(an);
+      const tt = [t[0] * ca - t[1] * sa, t[0] * sa + t[1] * ca], n = [tt[1], -tt[0]];
+      for (let o = -R; o <= R; o++) {
+        let sum = 0;
+        for (let k = 0; k < 32; k++) {
+          const f = (-0.42 + 0.84 * k / 31) * L;
+          const x = Math.round(mid[0] + f * tt[0] + o * n[0]), y = Math.round(mid[1] + f * tt[1] + o * n[1]);
+          if (x < 0 || y < 0 || x >= W || y >= H) continue;
+          const j = y * W + x; const v = Math.abs(gx[j] * n[0] + gy[j] * n[1]); sum += v < 40 ? v : 40;
+        }
+        const s = sum / 32 - 0.02 * Math.abs(o);
+        if (s > best) { best = s; bl = [[mid[0] + o * n[0], mid[1] + o * n[1]], tt]; }
       }
-      if (best) pts.push(best);
     }
-    if (pts.length < 8) { lines.push(null); continue; }
-    let ln;
-    for (let it = 0; it < 3; it++) {
-      ln = fitLineTLS(pts);
-      const r = pts.map(p => Math.abs((p[0] - ln[2]) * ln[1] - (p[1] - ln[3]) * ln[0]));
-      const sr = r.slice().sort((x, y) => x - y); const lim = Math.max(2, sr[Math.floor(sr.length * 0.7)]);
-      const keep = pts.filter((p, j) => r[j] < lim); if (keep.length >= 6) pts = keep;
-    }
-    lines.push(fitLineTLS(pts));
+    lines.push(bl);
   }
-  const out = q.map(p => p.slice());
+  const out = [];
   for (let i = 0; i < 4; i++) {
-    const L1 = lines[(i + 3) % 4], L2 = lines[i]; if (!L1 || !L2) continue;
-    const det = L1[0] * -L2[1] - (-L2[0]) * L1[1]; if (Math.abs(det) < 1e-6) continue;
-    const bx = L2[2] - L1[2], by = L2[3] - L1[3];
-    const t = (bx * -L2[1] - (-L2[0]) * by) / det;
-    const p = [L1[2] + L1[0] * t, L1[3] + L1[1] * t];
-    if (dist(p, q[i]) < band * diag * 1.5) out[i] = p;
+    const [p1, d1] = lines[(i + 3) % 4], [p2, d2] = lines[i];
+    const det = d1[0] * -d2[1] - (-d2[0]) * d1[1];
+    let p = null;
+    if (Math.abs(det) > 1e-9) { const bx = p2[0] - p1[0], by = p2[1] - p1[1]; const t1 = (bx * -d2[1] - (-d2[0]) * by) / det; p = [p1[0] + d1[0] * t1, p1[1] + d1[1] * t1]; }
+    out.push(p && dist2(p, q[i]) < 0.1 * big ? p : q[i].slice());
   }
   return out;
+}
+function gradSupport(gx, gy, W, H, q) {
+  const res = [];
+  for (let i = 0; i < 4; i++) {
+    const a = q[i], b = q[(i + 1) % 4], L = dist2(a, b), t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L], n = [t[1], -t[0]];
+    let hit = 0, tot = 0;
+    for (let k = 0; k < 48; k++) {
+      const f = 0.06 + 0.88 * k / 47, p = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+      let ok = false, inb = false;
+      for (let s = -2; s <= 2; s++) {
+        const x = p[0] + n[0] * s, y = p[1] + n[1] * s;
+        if (!(x >= 0 && x < W && y >= 0 && y < H)) continue;
+        inb = true; const j = (y | 0) * W + (x | 0), gxv = gx[j], gyv = gy[j], m = Math.hypot(gxv, gyv);
+        if (m > 18 && Math.abs(gxv * n[0] + gyv * n[1]) > 0.85 * m) { ok = true; break; }
+      }
+      if (inb) { tot++; if (ok) hit++; }
+    }
+    res.push(tot > 12 ? hit / tot : 0);
+  }
+  return res;
+}
+function sideContrast(lab, W, H, q, big) {
+  const cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
+  const off = Math.max(2, 0.012 * big), wid = Math.max(2, 0.012 * big), sh = off + wid / 2, res = [];
+  for (let i = 0; i < 4; i++) {
+    const a = q[i], b = q[(i + 1) % 4], L = dist2(a, b), t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+    let n = [t[1], -t[0]]; if (n[0] * ((a[0] + b[0]) / 2 - cx) + n[1] * ((a[1] + b[1]) / 2 - cy) < 0) n = [-n[0], -n[1]];
+    const ins = [], outs = [];
+    for (let k = 0; k < 24; k++) {
+      const f = 0.15 + 0.7 * k / 23, p = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+      for (const [s, arr] of [[-sh, ins], [sh, outs]]) {
+        const x = p[0] + n[0] * s, y = p[1] + n[1] * s;
+        if (x >= 0 && x < W && y >= 0 && y < H) { const j = ((y | 0) * W + (x | 0)) * 3; arr.push([lab[j], lab[j + 1], lab[j + 2]]); }
+      }
+    }
+    if (ins.length < 8 || outs.length < 8) { res.push(0); continue; }
+    const m = Math.min(ins.length, outs.length), dd = [];
+    for (let k = 0; k < m; k++) dd.push(Math.hypot(ins[k][0] - outs[k][0], ins[k][1] - outs[k][1], ins[k][2] - outs[k][2]));
+    dd.sort((x, y) => x - y); res.push(m % 2 ? dd[(m - 1) / 2] : (dd[m / 2 - 1] + dd[m / 2]) / 2);
+  }
+  return res;
+}
+function detectCard(cv, img) {
+  const W = img.width, H = img.height, big = Math.max(W, H), mats = [];
+  const M = m => { mats.push(m); return m; };
+  try {
+    const src = M(cv.matFromImageData(img)), rgb = M(new cv.Mat()); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
+    const gray = M(new cv.Mat()); cv.cvtColor(rgb, gray, cv.COLOR_RGB2GRAY);
+    const bl = M(new cv.Mat()); cv.GaussianBlur(gray, bl, new cv.Size(5, 5), 0);
+    const bl9 = M(new cv.Mat()); cv.GaussianBlur(gray, bl9, new cv.Size(9, 9), 0);
+    const k5 = M(cv.Mat.ones(5, 5, cv.CV_8U));
+    let cands = [];
+    const addContours = (m, mode, tag) => {
+      const cs = new cv.MatVector(), hi = new cv.Mat();
+      cv.findContours(m, cs, hi, mode, cv.CHAIN_APPROX_SIMPLE);
+      const list = []; for (let i = 0; i < cs.size(); i++) { const c = cs.get(i); list.push({ c, a: cv.contourArea(c) }); }
+      list.sort((x, y) => y.a - x.a);
+      list.slice(0, 6).forEach(({ c }) => { if (c.rows < 4) return; const { q, ha } = quadFromContour(cv, c); cands.push({ s: baseScore(q, ha, W, H), tag, q }); });
+      list.forEach(({ c }) => c.delete()); cs.delete(); hi.delete();
+    };
+    for (const [s, lo, hiT] of [[bl9, 8, 24], [bl, 20, 60], [bl, 40, 120], [bl, 80, 200]]) {
+      const e = new cv.Mat(); cv.Canny(s, e, lo, hiT); cv.morphologyEx(e, e, cv.MORPH_CLOSE, k5); addContours(e, cv.RETR_LIST, 'canny'); e.delete();
+    }
+    // colour distance from the background (k-means of the border strip)
+    const rgbB = M(new cv.Mat()); cv.GaussianBlur(rgb, rgbB, new cv.Size(5, 5), 0);
+    const labM = M(new cv.Mat()); cv.cvtColor(rgbB, labM, cv.COLOR_RGB2Lab);
+    const L5 = labM.data, b = Math.max(2, Math.floor(0.04 * big));
+    const bp = [];
+    const pushPx = (x, y) => { const j = (y * W + x) * 3; bp.push(L5[j], L5[j + 1], L5[j + 2]); };
+    for (let y = 0; y < b; y++) for (let x = 0; x < W; x++) pushPx(x, y);
+    for (let y = H - b; y < H; y++) for (let x = 0; x < W; x++) pushPx(x, y);
+    for (let y = 0; y < H; y++) for (let x = 0; x < b; x++) pushPx(x, y);
+    for (let y = 0; y < H; y++) for (let x = W - b; x < W; x++) pushPx(x, y);
+    const nb = bp.length / 3, stp = Math.max(1, Math.floor(nb / 4000)), sp = [];
+    for (let i = 0; i < nb; i += stp) sp.push(bp[i * 3], bp[i * 3 + 1], bp[i * 3 + 2]);
+    const cent = kmeans(Float32Array.from(sp), 5);
+    const dmin = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) {
+      let m = Infinity; const l = L5[i * 3], a = L5[i * 3 + 1], bb = L5[i * 3 + 2];
+      for (const c of cent) { const e = (l - c[0]) ** 2 + ((a - c[1]) * 1.4) ** 2 + ((bb - c[2]) * 1.4) ** 2; if (e < m) m = e; }
+      dmin[i] = Math.sqrt(m);
+    }
+    const sorted = Float32Array.from(dmin).sort(); const p995 = sorted[Math.floor((sorted.length - 1) * 0.995)];
+    const dm = M(new cv.Mat(H, W, cv.CV_8UC1)), sc = 255 / Math.max(1, p995);
+    for (let i = 0; i < W * H; i++) { const v = dmin[i] * sc; dm.data[i] = v > 255 ? 255 : v; }
+    // whiteness
+    const hsv = M(new cv.Mat()); cv.cvtColor(rgb, hsv, cv.COLOR_RGB2HSV);
+    const wm = M(new cv.Mat(H, W, cv.CV_8UC1));
+    for (let i = 0; i < W * H; i++) { const v = hsv.data[i * 3 + 2] - hsv.data[i * 3 + 1] * 1.5; wm.data[i] = v < 0 ? 0 : v > 255 ? 255 : v; }
+    cv.GaussianBlur(wm, wm, new cv.Size(5, 5), 0);
+    for (const [name, mp] of [['dist', dm], ['white', wm]]) {
+      const tmp = new cv.Mat(); const ots = cv.threshold(mp, tmp, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU); tmp.delete();
+      const ths = [ots, ...[70, 80, 88, 94].map(p => histPercentile(mp.data, p))];
+      for (const th of ths) for (const kk of [0.03, 0.07]) {
+        const k = Math.floor(big * kk) | 1, m = new cv.Mat();
+        cv.threshold(mp, m, Math.ceil(th) - 1, 255, cv.THRESH_BINARY);
+        cv.morphologyEx(m, m, cv.MORPH_OPEN, k5);
+        const ke = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(k, k)); cv.morphologyEx(m, m, cv.MORPH_CLOSE, ke); ke.delete();
+        addContours(m, cv.RETR_EXTERNAL, name); m.delete();
+      }
+    }
+    cands = cands.filter(c => c.s > 0).sort((x, y) => y.s - x.s).slice(0, 40);
+    // straight lines → quads
+    const segs = [];
+    for (const [lo, hiT] of [[15, 45], [40, 120]]) {
+      const e = new cv.Mat(), ln = new cv.Mat(); cv.Canny(bl, e, lo, hiT);
+      cv.HoughLinesP(e, ln, 1, Math.PI / 360, Math.floor(big * 0.05), Math.floor(big * 0.06), Math.floor(big * 0.015));
+      for (let i = 0; i < ln.rows; i++) segs.push([ln.data32S[i * 4], ln.data32S[i * 4 + 1], ln.data32S[i * 4 + 2], ln.data32S[i * 4 + 3]]);
+      e.delete(); ln.delete();
+    }
+    const lines = [];
+    for (const [x1, y1, x2, y2] of segs) {
+      const th = ((Math.atan2(y2 - y1, x2 - x1) % Math.PI) + Math.PI) % Math.PI, rho = -Math.sin(th) * x1 + Math.cos(th) * y1, len = Math.hypot(x2 - x1, y2 - y1);
+      let merged = false;
+      for (const l of lines) {
+        let d = Math.abs(l[0] - th); d = Math.min(d, Math.PI - d);
+        if (d < 3 * Math.PI / 180) { const r2 = -Math.sin(l[0]) * (x1 + x2) / 2 + Math.cos(l[0]) * (y1 + y2) / 2; if (Math.abs(r2 - l[1]) < 0.012 * big) { l[2] += len; merged = true; break; } }
+      }
+      if (!merged) lines.push([th, rho, len]);
+    }
+    lines.sort((a, c) => c[2] - a[2]); const LN = lines.slice(0, 22);
+    const angD = (a, c) => { let d = Math.abs(a - c); return Math.min(d, Math.PI - d); };
+    const pairs = [];
+    for (let i = 0; i < LN.length; i++) for (let j = i + 1; j < LN.length; j++) if (angD(LN[i][0], LN[j][0]) < 25 * Math.PI / 180) pairs.push([i, j]);
+    const hq = [];
+    for (let a = 0; a < pairs.length; a++) for (let c = a + 1; c < pairs.length; c++) {
+      const [i, j] = pairs[a], [k, m] = pairs[c];
+      if (i === k || i === m || j === k || j === m) continue;
+      if (angD(LN[i][0], LN[k][0]) < 55 * Math.PI / 180) continue;
+      const pts = [lineInter(LN[i], LN[k]), lineInter(LN[k], LN[j]), lineInter(LN[j], LN[m]), lineInter(LN[m], LN[i])];
+      if (pts.some(p => !p)) continue;
+      if (pts.some(p => p[0] < -0.02 * W || p[1] < -0.02 * H || p[0] > 1.02 * W || p[1] > 1.02 * H)) continue;
+      if (!isConvex(pts)) continue;
+      const q = orderQuad(pts), s = baseScore(q, polyArea(q), W, H);
+      if (s > 0) hq.push({ s, tag: 'hough', q });
+    }
+    cands = cands.concat(hq);
+    // a card's white panel without its magnetic stripe is too wide: extend it to card shape
+    const ext = [];
+    cands.slice().sort((x, y) => y.s - x.s).slice(0, 30).forEach(c => {
+      const q = c.q, sd = sides(q), w = (sd[0] + sd[2]) / 2, h = (sd[1] + sd[3]) / 2;
+      const ar = w >= h ? w / h : h / w, lng = w >= h ? [0, 1, 2, 3] : [1, 2, 3, 0];
+      if (ar < 1.75 || ar > 3.2) return;
+      const [a0, a1, a2, a3] = lng.map(k => q[k]), r = ar / CARD_AR - 1;
+      const v1 = [a2[0] - a1[0], a2[1] - a1[1]], v0 = [a3[0] - a0[0], a3[1] - a0[1]];
+      for (const nq of [[[a0[0] - v0[0] * r, a0[1] - v0[1] * r], [a1[0] - v1[0] * r, a1[1] - v1[1] * r], a2, a3], [a0, a1, [a2[0] + v1[0] * r, a2[1] + v1[1] * r], [a3[0] + v0[0] * r, a3[1] + v0[1] * r]]]) {
+        if (nq.some(p => p[0] < -0.02 * W || p[1] < -0.02 * H || p[0] > 1.02 * W || p[1] > 1.02 * H)) continue;
+        const cq = orderQuad(nq.map(p => [Math.min(W - 1, Math.max(0, p[0])), Math.min(H - 1, Math.max(0, p[1]))]));
+        const s = baseScore(cq, polyArea(cq), W, H); if (s > 0) ext.push({ s, tag: c.tag + '+ext', q: cq });
+      }
+    });
+    cands = cands.concat(ext).sort((x, y) => y.s - x.s);
+    const uniq = [], cnt = {};
+    for (const c of cands) {
+      const g = c.tag.endsWith('+ext') ? 'ext' : c.tag === 'hough' ? 'hough' : c.tag === 'canny' ? 'canny' : 'mask';
+      if ((cnt[g] || 0) >= 14) continue;
+      if (uniq.every(u => Math.max(...u.q.map((p, i) => Math.max(Math.abs(p[0] - c.q[i][0]), Math.abs(p[1] - c.q[i][1])))) > 0.012 * big)) { uniq.push(c); cnt[g] = (cnt[g] || 0) + 1; }
+    }
+    if (!uniq.length) return null;
+    // gradients and Lab for scoring
+    const g3 = M(new cv.Mat()); cv.GaussianBlur(gray, g3, new cv.Size(3, 3), 0);
+    const gd = g3.data, gx = new Float32Array(W * H), gy = new Float32Array(W * H);
+    const P = (x, y) => gd[(y < 0 ? -y : y >= H ? 2 * H - y - 2 : y) * W + (x < 0 ? -x : x >= W ? 2 * W - x - 2 : x)];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      gx[y * W + x] = ((P(x + 1, y - 1) + 2 * P(x + 1, y) + P(x + 1, y + 1)) - (P(x - 1, y - 1) + 2 * P(x - 1, y) + P(x - 1, y + 1))) / 4;
+      gy[y * W + x] = ((P(x - 1, y + 1) + 2 * P(x, y + 1) + P(x + 1, y + 1)) - (P(x - 1, y - 1) + 2 * P(x, y - 1) + P(x + 1, y - 1))) / 4;
+    }
+    const rgb7 = M(new cv.Mat()); cv.GaussianBlur(rgb, rgb7, new cv.Size(7, 7), 0);
+    const lab7 = M(new cv.Mat()); cv.cvtColor(rgb7, lab7, cv.COLOR_RGB2Lab);
+    let best = null;
+    for (const c of uniq) {
+      const q = snapQuad(gx, gy, W, H, c.q, big);
+      const sup = gradSupport(gx, gy, W, H, q), con = sideContrast(lab7.data, W, H, q, big);
+      for (let j = 0; j < 4; j++) if (onBorder(q[j], q[(j + 1) % 4], W, H, big)) { sup[j] = 0.6; con[j] = 12; }
+      const s2 = sup.slice().sort((x, y) => x - y), cs = con.slice().sort((x, y) => x - y);
+      const S = 0.4 * s2[0] + 0.2 * s2[1] + 0.4 * (s2[0] + s2[1] + s2[2] + s2[3]) / 4;
+      const C = Math.min(1, cs[0] / 16) * 0.5 + Math.min(1, cs[1] / 40) * 0.5;
+      const A = Math.exp(-Math.abs(Math.log(quadAR(q) / CARD_AR)) * 3);
+      const total = S * Math.pow(0.05 + C, 3) * A * (polyArea(q) / (W * H));
+      if (!best || total > best.total) best = { total, q, tag: c.tag };
+    }
+    return best ? { quad: best.q, confidence: best.total } : null;
+  } finally { mats.forEach(m => { try { m.delete(); } catch (e) {} }); }
 }
 
 
@@ -362,6 +620,7 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const PRESETS = { id1: [85.6, 54], id3: [125, 88], a4: [210, 297], letter: [215.9, 279.4] };
 const PAPER = { a4: [210, 297], letter: [215.9, 279.4] };
 const ADJ0 = { exposure: 0, contrast: 0, shadows: 0, saturation: 0, warmth: 0, sharpen: 25, mode: 'color', bw: 150, levels: false, pad: 0 };
+const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 let cv = null, cvState = 'loading';
 const pages = [];
 let uid = 1;
@@ -372,7 +631,7 @@ const saveSettings = () => { try { localStorage.setItem('cardflat-settings', JSO
 function toast(msg) {
   document.querySelectorAll('.toast').forEach(t => t.remove());
   const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = msg; document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2800);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 260); }, 2800);
 }
 const ICON = {
   corners: '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
@@ -380,7 +639,7 @@ const ICON = {
   rotr: '<path d="M20 4v6h-6"/><path d="M19.5 10A8 8 0 1 0 18 16.5"/>',
   flip: '<path d="M12 3v18M8 7l-5 5 5 5M16 7l5 5-5 5"/>',
   up: '<path d="M12 19V5M6 11l6-6 6 6"/>', down: '<path d="M12 5v14M6 13l6 6 6-6"/>',
-  del: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', car: '<path d="M9 6l6 6-6 6"/>'
+  del: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', car: '<path d="M9 6l6 6-6 6"/>', edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>'
 };
 const ic = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
 
@@ -595,30 +854,31 @@ function updateExportLabel(sheets) {
   $('#mbarMeta').textContent = n ? `${n} card${n > 1 ? 's' : ''}${sample ? ' (sample)' : ''} · ${({ stack: 'Stacked', side: 'Side by side', print: 'Print page', separate: 'Separate' })[S.layout]} · ${S.dpi} dpi` : 'No cards yet';
 }
 
+
+
 // ---------- page cards UI ----------
 function pageCardHTML(p) {
   return `
   <div class="page-main">
-    <div class="result" data-act="corners" title="Adjust corners"><canvas></canvas><div class="busy" hidden>Finding card…</div></div>
+    <div class="result" data-act="corners" title="Adjust corners"><canvas></canvas><div class="scan" hidden><span>Finding card…</span></div><span class="tap">${ic('edit')}Corners</span></div>
     <div class="side">
       <div class="namerow"><input aria-label="Card name" value=""><span class="chip"></span></div>
-      <div class="thumbsrc"><canvas width="108" height="108" aria-hidden="true"></canvas><div class="meta"></div></div>
+      <div class="thumbsrc"><canvas width="104" height="104" aria-hidden="true"></canvas><div class="meta"></div></div>
       <div class="tools">
-        <button class="btn" data-act="corners">${ic('corners')}Corners</button>
-        <button class="btn icon ghost" data-act="rotl" title="Rotate left" aria-label="Rotate left">${ic('rotl')}</button>
-        <button class="btn icon ghost" data-act="rotr" title="Rotate right" aria-label="Rotate right">${ic('rotr')}</button>
-        <button class="btn icon ghost" data-act="flip" title="Mirror" aria-label="Mirror">${ic('flip')}</button>
-        <span class="sep"></span>
-        <button class="btn icon ghost" data-act="up" title="Move up" aria-label="Move up">${ic('up')}</button>
-        <button class="btn icon ghost" data-act="down" title="Move down" aria-label="Move down">${ic('down')}</button>
-        <button class="btn icon ghost" data-act="del" title="Remove" aria-label="Remove">${ic('del')}</button>
+        <button class="btn main" data-act="corners">${ic('corners')}Corners</button>
+        <button class="btn" data-act="rotl" aria-label="Rotate left">${ic('rotl')}Left</button>
+        <button class="btn" data-act="rotr" aria-label="Rotate right">${ic('rotr')}Right</button>
+        <button class="btn" data-act="flip" aria-label="Mirror">${ic('flip')}Mirror</button>
+        <button class="btn" data-act="up" aria-label="Move up">${ic('up')}Up</button>
+        <button class="btn" data-act="down" aria-label="Move down">${ic('down')}Down</button>
+        <button class="btn" data-act="del" aria-label="Remove">${ic('del')}Remove</button>
       </div>
     </div>
   </div>
-  <details class="adj"><summary>${'<span class="car">' + ic('car') + '</span>'}Adjust image <span class="changed"></span></summary>
+  <details class="adj"><summary><span class="car">${ic('car')}</span>Adjust image <span class="changed"></span></summary>
     <div class="adj-body">
-      <div class="ctl" style="grid-column:1/-1"><span class="lbl">Colour</span>
-        <div class="seg" data-k="mode"><button data-v="color">Colour</button><button data-v="gray">Grayscale</button><button data-v="bw">Black &amp; white</button></div></div>
+      <div class="ctl span2"><span class="lbl">Colour</span>
+        <div class="seg" data-k="mode"><button data-v="color">Colour</button><button data-v="gray">Grayscale</button><button data-v="bw">B &amp; W</button></div></div>
       ${slider('exposure', 'Brightness', -100, 100)}
       ${slider('contrast', 'Contrast', -100, 100)}
       ${slider('shadows', 'Shadows', -100, 100)}
@@ -627,8 +887,8 @@ function pageCardHTML(p) {
       ${slider('sharpen', 'Sharpness', 0, 100)}
       ${slider('bw', 'B&amp;W threshold', 40, 230)}
       ${slider('pad', 'Edge trim / extend', -6, 10, 0.5)}
-      <label class="check" style="grid-column:1/-1"><input type="checkbox" data-k="levels"> Auto levels (fixes dull or dim photos)</label>
-      <div class="adj-actions">
+      <label class="check span2"><input type="checkbox" data-k="levels"> Auto levels (fixes dull or dim photos)</label>
+      <div class="adj-actions span2">
         <button class="btn" data-act="enhance">Auto-enhance</button>
         <button class="btn" data-act="all">Apply to all cards</button>
         <button class="btn ghost" data-act="reset">Reset</button>
@@ -646,17 +906,20 @@ function mountPage(p) {
   el.addEventListener('click', e => {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const act = b.dataset.act, i = pages.indexOf(p);
-    if (act === 'corners') { if (p.ready) openEditor(p); return; }
+    if (act === 'corners') { if (p.ready && p.status !== 'detecting') openEditor(p); return; }
     if (act === 'rotl') p.rot = (p.rot + 270) % 360;
     if (act === 'rotr') p.rot = (p.rot + 90) % 360;
     if (act === 'flip') p.flip = !p.flip;
-    if (act === 'up' && i > 0) { pages.splice(i, 1); pages.splice(i - 1, 0, p); relist(); }
-    if (act === 'down' && i < pages.length - 1) { pages.splice(i, 1); pages.splice(i + 1, 0, p); relist(); }
-    if (act === 'del') { pages.splice(i, 1); el.remove(); relist(); schedulePreview(); return; }
+    if (act === 'up' && i > 0) { pages.splice(i, 1); pages.splice(i - 1, 0, p); relist(true); }
+    if (act === 'down' && i < pages.length - 1) { pages.splice(i, 1); pages.splice(i + 1, 0, p); relist(true); }
+    if (act === 'del') {
+      pages.splice(i, 1); el.style.animation = ''; el.classList.add('leaving');
+      setTimeout(() => { el.remove(); relist(); schedulePreview(); }, REDUCED ? 0 : 260); return;
+    }
     if (act === 'reset') { p.adj = { ...ADJ0 }; syncAdj(p); }
     if (act === 'enhance') { Object.assign(p.adj, { levels: true, contrast: 12, saturation: 10, sharpen: 40, shadows: 15 }); syncAdj(p); }
     if (act === 'all') { pages.forEach(q => { if (q !== p) { const pad = q.adj.pad; q.adj = { ...p.adj, pad }; if (q.el) { syncAdj(q); refreshPage(q); } } }); toast('Adjustments applied to all cards'); }
-    refreshPage(p); schedulePreview();
+    refreshPage(p, ['rotl', 'rotr', 'flip'].includes(act)); schedulePreview();
   });
   el.querySelectorAll('input[type=range][data-k]').forEach(r => {
     r.addEventListener('input', () => { p.adj[r.dataset.k] = +r.value; syncAdj(p, true); refreshPageSoon(p); });
@@ -680,31 +943,38 @@ function refreshPageSoon(p) {
   if (rafs.get(p)) return;
   rafs.set(p, requestAnimationFrame(() => { rafs.delete(p); refreshPage(p); schedulePreview(120); }));
 }
-function refreshPage(p) {
+const STATUS = {
+  detecting: ['Finding card…', ''], auto: ['Auto-straightened', 'auto'], check: ['Check the corners', 'warn'], manual: ['Corners set by hand', ''],
+  fallback: ['Edges not found · set corners', 'warn'], waiting: ['Waiting for finder', '']
+};
+function refreshPage(p, animate) {
   const el = p.el; if (!el) return;
-  const chip = el.querySelector('.chip');
-  const st = { detecting: ['Finding card…', ''], auto: ['Auto-straightened', 'auto'], manual: ['Corners set by hand', ''], fallback: ['Card edges not found · set corners', 'warn'], waiting: ['Waiting for edge finder', ''] }[p.status];
-  chip.textContent = p.sample ? 'Sample' : st[0]; chip.className = 'chip ' + (p.sample ? 'sample' : st[1]);
-  el.querySelector('.busy').hidden = p.status !== 'detecting';
+  const chip = el.querySelector('.chip'), st = STATUS[p.status];
+  const txt = p.sample ? 'Sample' : st[0];
+  if (chip.textContent !== txt) { chip.textContent = txt; chip.className = 'chip ' + (p.sample ? 'sample' : st[1]); chip.classList.remove('pop'); void chip.offsetWidth; chip.classList.add('pop'); }
+  el.querySelector('.scan').hidden = p.status !== 'detecting';
   if (!p.ready) return;
-  // source thumb with quad
   const th = el.querySelector('.thumbsrc canvas'), tx = th.getContext('2d');
-  const s = Math.max(108 / p.src.width, 108 / p.src.height);
-  tx.clearRect(0, 0, 108, 108); tx.save(); tx.translate(54 - p.src.width * s / 2, 54 - p.src.height * s / 2); tx.scale(s, s);
+  const s = Math.max(104 / p.src.width, 104 / p.src.height);
+  tx.clearRect(0, 0, 104, 104); tx.save(); tx.translate(52 - p.src.width * s / 2, 52 - p.src.height * s / 2); tx.scale(s, s);
   tx.drawImage(p.src, 0, 0); tx.beginPath(); p.quad.forEach((q, i) => i ? tx.lineTo(q[0], q[1]) : tx.moveTo(q[0], q[1])); tx.closePath();
   tx.lineWidth = 3 / s; tx.strokeStyle = '#41c3a2'; tx.stroke(); tx.restore();
   const [w, h] = finalMM(p);
-  el.querySelector('.thumbsrc .meta').textContent = `${fmtMM(w)} × ${fmtMM(h)} mm${p.rot ? ' · rotated ' + p.rot + '°' : ''}${p.flip ? ' · mirrored' : ''}\nfrom ${p.src.width} × ${p.src.height} px photo`;
-  el.querySelector('.thumbsrc .meta').style.whiteSpace = 'pre-line';
-  const rc = el.querySelector('.result canvas');
-  const box = Math.min(560, Math.max(260, (el.querySelector('.result').clientWidth || 420) - 32)) * Math.min(2, window.devicePixelRatio || 1);
-  const c = renderCard(p, clamp(box / w, 1, 7.5));
+  el.querySelector('.thumbsrc .meta').textContent = `${fmtMM(w)} × ${fmtMM(h)} mm${p.rot ? ' · ' + p.rot + '°' : ''}${p.flip ? ' · mirrored' : ''}\nfrom ${p.src.width} × ${p.src.height} px photo`;
+  const box = el.querySelector('.result'), rc = box.querySelector('canvas');
+  const bw = Math.min(620, Math.max(240, (box.clientWidth || 360) - 32)) * Math.min(2, window.devicePixelRatio || 1);
+  const c = renderCard(p, clamp(bw / w, 1, 7.5));
   rc.width = c.width; rc.height = c.height; rc.getContext('2d').drawImage(c, 0, 0);
+  if (animate && !REDUCED) { box.classList.remove('settle'); void box.offsetWidth; box.classList.add('settle'); }
 }
-function relist() {
+function relist(keepAnim) {
   const box = $('#pages'); box.innerHTML = '';
-  if (!pages.length) { box.innerHTML = '<div class="empty">No cards yet. Add a photo of the front and one of the back.</div>'; }
-  pages.forEach((p, i) => { box.appendChild(p.el); const up = p.el.querySelector('[data-act=up]'), dn = p.el.querySelector('[data-act=down]'); up.disabled = i === 0; dn.disabled = i === pages.length - 1; });
+  if (!pages.length) { box.innerHTML = '<div class="empty">No cards yet. Take or choose a photo of the front, then one of the back.</div>'; }
+  pages.forEach((p, i) => {
+    if (keepAnim) p.el.style.animation = 'none';
+    box.appendChild(p.el);
+    p.el.querySelector('[data-act=up]').disabled = i === 0; p.el.querySelector('[data-act=down]').disabled = i === pages.length - 1;
+  });
   updateExportLabel(layoutSheets());
 }
 
@@ -720,10 +990,11 @@ async function loadSource(blob) {
 }
 function defaultName(i) { return ['Front', 'Back'][i] || 'Card ' + (i + 1); }
 async function addCanvas(src, opts = {}) {
-  const p = { id: uid++, name: opts.name || defaultName(pages.length), src, data: src.getContext('2d').getImageData(0, 0, src.width, src.height), rot: 0, flip: false, adj: { ...ADJ0 }, status: 'detecting', ready: false, sample: !!opts.sample };
+  const p = { id: uid++, name: opts.name || defaultName(pages.length), src, data: src.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, src.width, src.height), rot: 0, flip: false, adj: { ...ADJ0 }, status: 'detecting', ready: false, sample: !!opts.sample };
   const iw = src.width, ih = src.height, m = 0.08;
   p.quad = [[iw * m, ih * m], [iw * (1 - m), ih * m], [iw * (1 - m), ih * (1 - m)], [iw * m, ih * (1 - m)]];
   pages.push(p); mountPage(p); relist(); refreshPage(p);
+  if (!opts.sample) setTimeout(() => p.el && p.el.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'center' }), 60);
   await runDetect(p);
   return p;
 }
@@ -740,18 +1011,24 @@ async function addFiles(files) {
 function detectQuad(p) {
   const s = Math.min(1, 800 / Math.max(p.src.width, p.src.height));
   const c = document.createElement('canvas'); c.width = Math.round(p.src.width * s); c.height = Math.round(p.src.height * s);
-  const x = c.getContext('2d'); x.drawImage(p.src, 0, 0, c.width, c.height);
-  const q = detectCard(cv, x.getImageData(0, 0, c.width, c.height));
-  return q ? q.map(([a, b]) => [clamp(a / s, 0, p.src.width - 1), clamp(b / s, 0, p.src.height - 1)]) : null;
+  const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(p.src, 0, 0, c.width, c.height);
+  const r = detectCard(cv, x.getImageData(0, 0, c.width, c.height));
+  if (!r) return null;
+  return { q: r.quad.map(([a, b]) => [clamp(a / s, 0, p.src.width - 1), clamp(b / s, 0, p.src.height - 1)]), conf: r.confidence };
 }
-async function runDetect(p, force) {
-  if (cvState === 'loading') { p.status = 'waiting'; p.ready = true; refreshPage(p); schedulePreview(); return; }
-  if (cvState === 'failed') { p.status = 'fallback'; p.ready = true; refreshPage(p); schedulePreview(); return; }
-  p.status = 'detecting'; refreshPage(p);
-  await new Promise(r => setTimeout(r, 30));
-  let q = null; try { q = detectQuad(p); } catch (e) { console.error(e); }
-  if (q) { p.quad = q; p.status = 'auto'; p.cache = null; } else p.status = 'fallback';
-  p.ready = true; refreshPage(p); schedulePreview();
+let detectQueue = Promise.resolve();
+function runDetect(p) {
+  const job = async () => {
+    if (cvState === 'loading') { p.status = 'waiting'; p.ready = true; refreshPage(p); schedulePreview(); return; }
+    if (cvState === 'failed') { p.status = 'fallback'; p.ready = true; refreshPage(p); schedulePreview(); return; }
+    p.status = 'detecting'; refreshPage(p);
+    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 40)));
+    let r = null; try { r = detectQuad(p); } catch (e) { console.error(e); }
+    if (r) { p.quad = r.q; p.status = r.conf < 0.02 ? 'check' : 'auto'; p.cache = null; } else p.status = 'fallback';
+    p.ready = true; refreshPage(p, true); schedulePreview();
+  };
+  detectQueue = detectQueue.then(job, job);
+  return detectQueue;
 }
 
 // ---------- OpenCV loading ----------
@@ -759,19 +1036,18 @@ function loadCV() {
   const st = $('#cvstat');
   const s = document.createElement('script');
   s.src = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js'; s.async = true;
-  const fail = () => { cvState = 'failed'; st.textContent = 'Auto-detect offline · set corners by hand'; st.className = 'cvstat bad'; pages.filter(p => p.status === 'waiting').forEach(p => runDetect(p)); };
+  const fail = () => { if (cvState === 'ready') return; cvState = 'failed'; st.textContent = 'Manual corners'; st.className = 'cvstat bad'; st.title = 'Auto-detect could not load. Set corners by hand.'; pages.filter(p => p.status === 'waiting').forEach(p => runDetect(p)); };
   const timer = setTimeout(fail, 60000);
   s.onload = async () => {
     try {
       let m = window.cv;
       if (m && typeof m.then === 'function' && !m.Mat) {
-        // Emscripten module is a thenable: resolve with nothing to avoid thenable recursion
         await new Promise(r => { const prev = m.onRuntimeInitialized; m.onRuntimeInitialized = () => { prev && prev(); r(); }; m.then(mm => { if (mm && mm.Mat) m = mm; r(); }); });
       } else if (!m.Mat) await new Promise(r => { m.onRuntimeInitialized = r; });
       if (!m || !m.Mat) throw new Error('OpenCV did not start');
       cv = m; cvState = 'ready'; clearTimeout(timer);
       st.textContent = 'Auto-detect ready'; st.className = 'cvstat ok';
-      for (const p of pages.filter(p => p.status === 'waiting')) await runDetect(p);
+      pages.filter(p => p.status === 'waiting').forEach(p => runDetect(p));
     } catch (e) { console.error(e); clearTimeout(timer); fail(); }
   };
   s.onerror = () => { clearTimeout(timer); fail(); };
@@ -779,13 +1055,18 @@ function loadCV() {
 }
 
 // ---------- corner editor ----------
-const E = { p: null, q: null, sel: 0, drag: null, view: null };
+const E = { p: null, q: null, q0: null, sel: -1, drag: null, view: null };
 function openEditor(p) {
-  E.p = p; E.q = p.quad.map(v => v.slice()); E.sel = -1; $('#ed').hidden = false; $('#edTitle').textContent = 'Corners · ' + (p.name || 'Card');
+  E.p = p; E.q = p.quad.map(v => v.slice()); E.q0 = p.quad.map(v => v.slice()); E.sel = -1;
+  const ed = $('#ed'); ed.classList.remove('closing'); ed.hidden = false; $('#edTitle').textContent = p.name || 'Card';
   $('#edAuto').disabled = cvState !== 'ready';
   document.body.style.overflow = 'hidden'; requestAnimationFrame(drawEditor);
 }
-function closeEditor() { $('#ed').hidden = true; document.body.style.overflow = ''; E.p = null; }
+function closeEditor() {
+  const ed = $('#ed'); E.p = null; document.body.style.overflow = '';
+  if (REDUCED) { ed.hidden = true; return; }
+  ed.classList.add('closing'); setTimeout(() => { ed.hidden = true; ed.classList.remove('closing'); }, 220);
+}
 function edPoints() {
   const q = E.q, pts = q.map((v, i) => ({ x: v[0], y: v[1], kind: 'c', i }));
   for (let i = 0; i < 4; i++) { const a = q[i], b = q[(i + 1) % 4]; pts.push({ x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2, kind: 'e', i }); }
@@ -796,44 +1077,53 @@ function drawEditor() {
   const cvs = $('#edCanvas'), st = $('#edStage'), dpr = window.devicePixelRatio || 1;
   const W = st.clientWidth, H = st.clientHeight; cvs.width = W * dpr; cvs.height = H * dpr;
   const x = cvs.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
-  const src = E.p.src, pad = 28, s = Math.min((W - pad * 2) / src.width, (H - pad * 2) / src.height);
+  const src = E.p.src, pad = 22, s = Math.min((W - pad * 2) / src.width, (H - pad * 2) / src.height);
   const ox = (W - src.width * s) / 2, oy = (H - src.height * s) / 2; E.view = { s, ox, oy };
   x.drawImage(src, ox, oy, src.width * s, src.height * s);
   const P = v => [ox + v[0] * s, oy + v[1] * s];
-  // dim outside
   const sq = E.q.map(P);
   x.fillStyle = 'rgba(0,0,0,.5)'; x.fillRect(ox, oy, src.width * s, src.height * s);
   x.save(); x.beginPath(); sq.forEach((v, i) => i ? x.lineTo(v[0], v[1]) : x.moveTo(v[0], v[1])); x.closePath(); x.clip();
   x.drawImage(src, ox, oy, src.width * s, src.height * s); x.restore();
   x.beginPath(); sq.forEach((v, i) => i ? x.lineTo(v[0], v[1]) : x.moveTo(v[0], v[1])); x.closePath(); x.lineWidth = 2; x.strokeStyle = '#41c3a2'; x.stroke();
-  // top edge marker (which side becomes the top)
   x.save(); x.lineWidth = 5; x.strokeStyle = 'rgba(65,195,162,.9)'; x.beginPath(); x.moveTo(...sq[0]); x.lineTo(...sq[1]); x.stroke(); x.restore();
   edPoints().forEach((pt, k) => {
     const [px, py] = P([pt.x, pt.y]); const active = E.drag ? E.drag.k === k : E.sel === k;
+    if (active) { x.beginPath(); x.arc(px, py, pt.kind === 'c' ? 22 : 15, 0, Math.PI * 2); x.fillStyle = 'rgba(65,195,162,.28)'; x.fill(); }
     x.beginPath(); x.arc(px, py, pt.kind === 'c' ? (active ? 13 : 11) : 7, 0, Math.PI * 2);
-    x.fillStyle = pt.kind === 'c' ? (active ? '#41c3a2' : 'rgba(255,255,255,.95)') : 'rgba(255,255,255,.8)'; x.fill();
+    x.fillStyle = pt.kind === 'c' ? (active ? '#41c3a2' : 'rgba(255,255,255,.95)') : (active ? '#41c3a2' : 'rgba(255,255,255,.8)'); x.fill();
     x.lineWidth = 2; x.strokeStyle = '#0b0f0e'; x.stroke();
   });
-  // loupe
   const k = E.drag ? E.drag.k : -1;
   if (k >= 0 && k < 4) {
-    const v = E.q[k], [px, py] = P(v), R = 62, Z = 4 / s * s;
-    const lx = px < W / 2 ? W - R - 16 : R + 16, ly = R + 16;
+    const v = E.q[k], [px] = P(v), R = Math.min(66, W / 5);
+    const lx = px < W / 2 ? W - R - 14 : R + 14, ly = R + 14, zs = s * 4;
     x.save(); x.beginPath(); x.arc(lx, ly, R, 0, Math.PI * 2); x.clip();
     x.fillStyle = '#000'; x.fillRect(lx - R, ly - R, R * 2, R * 2);
-    const zs = s * 4; x.drawImage(src, lx - v[0] * zs, ly - v[1] * zs, src.width * zs, src.height * zs);
-    // quad lines in loupe
+    x.drawImage(src, lx - v[0] * zs, ly - v[1] * zs, src.width * zs, src.height * zs);
     x.beginPath(); E.q.forEach((w, i) => { const X = lx + (w[0] - v[0]) * zs, Y = ly + (w[1] - v[1]) * zs; i ? x.lineTo(X, Y) : x.moveTo(X, Y); }); x.closePath(); x.strokeStyle = '#41c3a2'; x.lineWidth = 1.5; x.stroke();
     x.strokeStyle = '#fff'; x.lineWidth = 1; x.beginPath(); x.moveTo(lx - 10, ly); x.lineTo(lx + 10, ly); x.moveTo(lx, ly - 10); x.lineTo(lx, ly + 10); x.stroke();
     x.restore(); x.beginPath(); x.arc(lx, ly, R, 0, Math.PI * 2); x.lineWidth = 3; x.strokeStyle = '#fff'; x.stroke();
   }
+}
+// animate the quad from one shape to another (auto-detect, whole photo, undo)
+function tweenQuad(to) {
+  const from = E.q.map(v => v.slice()), t0 = performance.now(), D = REDUCED ? 1 : 360;
+  const step = now => {
+    if (!E.p) return;
+    const t = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - t, 3);
+    E.q = from.map((v, i) => [v[0] + (to[i][0] - v[0]) * e, v[1] + (to[i][1] - v[1]) * e]); drawEditor();
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 (() => {
   const st = $('#edStage');
   const toImg = e => { const r = st.getBoundingClientRect(), v = E.view; return [(e.clientX - r.left - v.ox) / v.s, (e.clientY - r.top - v.oy) / v.s]; };
   st.addEventListener('pointerdown', e => {
     if (!E.p) return; const [ix, iy] = toImg(e); const v = E.view;
-    let best = -1, bd = 34 / v.s; edPoints().forEach((pt, k) => { const d = Math.hypot(pt.x - ix, pt.y - iy) * (pt.kind === 'e' ? 1.15 : 1); if (d < bd) { bd = d; best = k; } });
+    const reach = (e.pointerType === 'touch' ? 40 : 28) / v.s;
+    let best = -1, bd = reach; edPoints().forEach((pt, k) => { const d = Math.hypot(pt.x - ix, pt.y - iy) * (pt.kind === 'e' ? 1.15 : 1); if (d < bd) { bd = d; best = k; } });
     if (best < 0) return;
     st.setPointerCapture(e.pointerId); E.sel = best; E.drag = { k: best, last: [ix, iy] }; drawEditor();
   });
@@ -857,9 +1147,16 @@ function drawEditor() {
     if (k < 4) mv(k); else { mv(k - 4); mv((k - 3) % 4); } drawEditor();
   });
   $('#edCancel').onclick = closeEditor;
-  $('#edApply').onclick = () => { const p = E.p; p.quad = E.q; p.cache = null; if (p.status !== 'auto' || true) p.status = 'manual'; closeEditor(); refreshPage(p); schedulePreview(); };
-  $('#edFull').onclick = () => { const w = E.p.src.width - 1, h = E.p.src.height - 1; E.q = [[0, 0], [w, 0], [w, h], [0, h]]; drawEditor(); };
-  $('#edAuto').onclick = () => { const q = detectQuad(E.p); if (q) { E.q = q; drawEditor(); } else toast('Could not find the card edges in this photo. Drag the corners instead.'); };
+  $('#edApply').onclick = () => { const p = E.p; const changed = p.quad.some((v, i) => Math.abs(v[0] - E.q[i][0]) + Math.abs(v[1] - E.q[i][1]) > 0.5); p.quad = E.q; p.cache = null; if (changed) p.status = 'manual'; closeEditor(); refreshPage(p, true); schedulePreview(); };
+  $('#edFull').onclick = () => { const w = E.p.src.width - 1, h = E.p.src.height - 1; tweenQuad([[0, 0], [w, 0], [w, h], [0, h]]); };
+  $('#edReset').onclick = () => tweenQuad(E.q0);
+  $('#edAuto').onclick = async () => {
+    const b = $('#edAuto'); b.disabled = true; const old = b.lastChild.textContent; b.lastChild.textContent = 'Finding…';
+    await new Promise(r => setTimeout(r, 30));
+    let r = null; try { r = detectQuad(E.p); } catch (e) { console.error(e); }
+    b.disabled = false; b.lastChild.textContent = old;
+    if (r) tweenQuad(r.q); else toast('Could not find the card edges in this photo. Drag the corners instead.');
+  };
 })();
 
 // ---------- export ----------
@@ -884,7 +1181,7 @@ function loadJsPDF() {
 async function doExport() {
   const sheets = layoutSheets(); if (!sheets.length) return;
   const btns = [$('#exportBtn'), $('#mExport')]; btns.forEach(b => b.disabled = true);
-  const old = $('#exportLbl').textContent; $('#exportLbl').textContent = 'Preparing…';
+  const old = $('#exportLbl').textContent, oldM = $('#mExport').textContent; $('#exportLbl').textContent = 'Preparing…'; $('#mExport').textContent = 'Preparing…';
   await new Promise(r => setTimeout(r, 30));
   try {
     const ppm = S.dpi / 25.4, base = (S.fname || 'id-card').replace(/[\\/:*?"<>|]+/g, '-').trim() || 'id-card';
@@ -908,7 +1205,7 @@ async function doExport() {
       }
     }
   } catch (e) { console.error(e); toast(e.message || 'Export failed'); }
-  $('#exportLbl').textContent = old; btns.forEach(b => b.disabled = false); updateExportLabel(sheets);
+  $('#exportLbl').textContent = old; $('#mExport').textContent = oldM; btns.forEach(b => b.disabled = false); updateExportLabel(sheets);
 }
 
 // ---------- settings UI ----------
@@ -926,13 +1223,14 @@ function syncSettings() {
   $('#qualCtl').hidden = S.fmt === 'png';
   $('#bgSeg button[data-v=transparent]').disabled = S.fmt !== 'png';
 }
-function onSetting(full) { syncSettings(); saveSettings(); if (full) pages.forEach(p => { p.cache = null; refreshPage(p); }); schedulePreview(); }
-$('#layoutSeg').onclick = e => { const b = e.target.closest('button'); if (b) { S.layout = b.dataset.v; onSetting(); } };
+function flashPreview() { const b = $('#previewBox'); if (REDUCED) return; b.classList.remove('fresh'); void b.offsetWidth; b.classList.add('fresh'); }
+function onSetting(full, flash) { syncSettings(); saveSettings(); if (full) pages.forEach(p => { p.cache = null; refreshPage(p); }); if (flash) flashPreview(); schedulePreview(); }
+$('#layoutSeg').onclick = e => { const b = e.target.closest('button'); if (b) { S.layout = b.dataset.v; onSetting(false, true); } };
 $('#bgSeg').onclick = e => { const b = e.target.closest('button'); if (b && !b.disabled) { S.bg = b.dataset.v; onSetting(true); } };
-$('#size').onchange = e => { S.size = e.target.value; onSetting(true); };
+$('#size').onchange = e => { S.size = e.target.value; onSetting(true, true); };
 $('#fmt').onchange = e => { S.fmt = e.target.value; if (S.fmt !== 'png' && S.bg === 'transparent') S.bg = 'white'; onSetting(); };
 $('#dpi').onchange = e => { S.dpi = +e.target.value; onSetting(); };
-$('#paper').onchange = e => { S.paper = e.target.value; onSetting(); };
+$('#paper').onchange = e => { S.paper = e.target.value; onSetting(false, true); };
 $('#gap').oninput = e => { S.gap = +e.target.value; onSetting(); };
 $('#margin').oninput = e => { S.margin = +e.target.value; onSetting(); };
 $('#round').onchange = e => { S.round = e.target.checked; onSetting(true); };
@@ -943,16 +1241,19 @@ $('#fname').oninput = e => { S.fname = e.target.value; saveSettings(); };
 $('#cw').onchange = e => { S.cw = clamp(+e.target.value || 85.6, 10, 600); onSetting(true); };
 $('#ch').onchange = e => { S.ch = clamp(+e.target.value || 54, 10, 600); onSetting(true); };
 $('#exportBtn').onclick = doExport; $('#mExport').onclick = doExport;
+$('#mOut').onclick = () => $('#outPanel').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
 
 // ---------- input wiring ----------
 $('#addBtn').onclick = () => $('#file').click();
+$('#camBtn').onclick = () => $('#cam').click();
 $('#file').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('#cam').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
 const drop = $('#drop');
 ['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); drop.classList.add('over'); } }));
 ['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { if (t === 'dragleave' && e.relatedTarget) return; drop.classList.remove('over'); }));
 document.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); addFiles(e.dataTransfer.files); } });
 document.addEventListener('paste', e => { const fs = [...(e.clipboardData && e.clipboardData.files || [])]; if (fs.length) addFiles(fs); });
-let rsT; window.addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => { pages.forEach(refreshPage); schedulePreview(); }, 200); });
+let rsT, lastW = window.innerWidth; window.addEventListener('resize', () => { if (Math.abs(window.innerWidth - lastW) < 40) return; lastW = window.innerWidth; clearTimeout(rsT); rsT = setTimeout(() => { pages.forEach(p => refreshPage(p)); schedulePreview(); }, 200); });
 
 // ---------- sample photos (generated, clearly marked) ----------
 function makeSample(back) {
@@ -999,6 +1300,7 @@ function makeSample(back) {
   x.putImageData(bg, 0, 0);
   return c;
 }
+
 
 syncSettings(); relist(); loadCV();
 (async () => {
