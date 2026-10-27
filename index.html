@@ -172,13 +172,31 @@ body.has-cards #out{animation:enter .6s .1s var(--ease) both}
 .tools .btn:hover{background:var(--sunk)}
 .tools .btn.main{color:var(--accent);background:var(--accent-soft)}
 .tools .btn svg{width:20px;height:20px}
-details.adj{border-top:1px solid var(--line)}
-details.adj>summary{list-style:none;cursor:pointer;padding:12px 14px;font-weight:600;font-size:.92rem;display:flex;align-items:center;gap:8px;min-height:48px}
-details.adj>summary::-webkit-details-marker{display:none}
-details.adj>summary .car{transition:transform .25s var(--ease);width:16px;height:16px;display:flex}
-details.adj[open]>summary .car{transform:rotate(90deg)}
-details.adj>summary .changed{font-weight:500;color:var(--accent);font-size:.78rem;margin-left:auto}
-details.adj[open] .adj-body{animation:reveal .35s var(--ease)}
+.adj-open{width:100%;border:0;border-top:1px solid var(--line);background:transparent;cursor:pointer;padding:12px 14px;font-weight:600;font-size:.92rem;display:flex;align-items:center;gap:10px;min-height:52px;text-align:left}
+.adj-open:hover{background:var(--sunk)}
+.adj-open svg{width:20px;height:20px;color:var(--accent);flex:none}
+.adj-open .changed{font-weight:500;color:var(--accent);font-size:.78rem;margin-left:auto}
+.adj-open .go{width:16px;height:16px;color:var(--muted);margin-left:6px}
+.adj-holder{display:none}
+/* adjust sheet: live image on top (or left), sliders below (or right) */
+.ae{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);animation:edIn .3s var(--ease) both}
+.ae.closing{animation:edOut .2s var(--ease) both}
+.ae-top{display:flex;align-items:center;gap:8px;padding:8px max(12px,env(safe-area-inset-right,0px)) 8px max(12px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line);background:var(--surface)}
+.ae-top h3{margin:0;flex:1;text-align:center;font-family:var(--f-display);font-size:1.02rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ae-body{flex:1;min-height:0;display:flex;flex-direction:column}
+.ae-view{flex:0 0 auto;height:min(40vh,340px);background:var(--sheet);display:flex;align-items:center;justify-content:center;padding:14px 16px;position:relative;touch-action:none}
+.ae-view canvas{max-width:100%;max-height:100%;display:block;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,.2),0 10px 26px rgba(0,0,0,.18)}
+.ae-cmp{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:10px;border:0;border-radius:99px;padding:8px 12px;font-size:.78rem;font-weight:600;background:color-mix(in srgb,var(--surface) 92%,transparent);color:var(--ink);box-shadow:var(--shadow);cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none}
+.ae-cmp.on{background:var(--ink);color:var(--surface)}
+.ae-label{position:absolute;left:max(12px,env(safe-area-inset-left,0px));bottom:10px;font-size:.72rem;font-weight:600;background:var(--ink);color:var(--surface);padding:4px 9px;border-radius:99px}
+.ae-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:env(safe-area-inset-bottom,0px)}
+.ae-scroll .adj-body{padding-top:14px;max-width:760px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (min-width:900px){
+  .ae-body{flex-direction:row}
+  .ae-view{flex:1;height:auto;padding:32px}
+  .ae-scroll{flex:0 0 400px;border-left:1px solid var(--line);background:var(--surface)}
+  .ae-scroll .adj-body{grid-template-columns:minmax(0,1fr)}
+}
 .adj-body{padding:2px 14px 16px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px 22px}
 @media (min-width:560px){.adj-body{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .ctl{display:flex;flex-direction:column;gap:6px;min-width:0}
@@ -397,6 +415,18 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
   <button class="btn ghost icon" id="mOut" aria-label="Output settings" title="Output settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
   <span class="meta" id="mbarMeta"></span>
   <button class="btn primary" id="mExport">Save</button>
+</div>
+
+<div class="ae" id="ae" hidden role="dialog" aria-modal="true" aria-label="Adjust image">
+  <div class="ae-top">
+    <button class="btn ghost" id="aeReset">Reset</button>
+    <h3 id="aeTitle">Adjust</h3>
+    <button class="btn primary" id="aeDone">Done</button>
+  </div>
+  <div class="ae-body">
+    <div class="ae-view" id="aeView"><canvas id="aeCanvas"></canvas><span class="ae-label" id="aeLabel" hidden>Original</span><button class="ae-cmp" id="aeCmp">Hold to compare</button></div>
+    <div class="ae-scroll" id="aeScroll"></div>
+  </div>
 </div>
 
 <div class="ed" id="ed" hidden role="dialog" aria-modal="true" aria-label="Adjust corners">
@@ -1005,7 +1035,8 @@ function pageCardHTML(p) {
       </div>
     </div>
   </div>
-  <details class="adj"><summary><span class="car">${ic('car')}</span>Adjust image <span class="changed"></span></summary>
+  <button class="adj-open" data-act="adjust"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Adjust image <span class="changed"></span><span class="go">${ic('car')}</span></button>
+  <div class="adj-holder">
     <div class="adj-body">
       <div class="ctl span2"><span class="lbl">Colour</span>
         <div class="seg" data-k="mode"><button data-v="color">Colour</button><button data-v="gray">Grayscale</button><button data-v="bw">B &amp; W</button></div></div>
@@ -1024,7 +1055,7 @@ function pageCardHTML(p) {
         <button class="btn ghost" data-act="reset">Reset</button>
       </div>
     </div>
-  </details>`;
+  </div>`;
 }
 function slider(k, label, min, max, step = 1) {
   return `<div class="ctl" data-wrap="${k}"><label>${label} <output data-o="${k}"></output></label><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" aria-label="${label.replace('&amp;', '&')}"></div>`;
@@ -1033,10 +1064,11 @@ function mountPage(p) {
   const el = document.createElement('article'); el.className = 'page'; el.innerHTML = pageCardHTML(p); p.el = el;
   const nameIn = el.querySelector('.namerow input'); nameIn.value = p.name;
   nameIn.addEventListener('input', () => { p.name = nameIn.value; });
-  el.addEventListener('click', e => {
+  const onAct = e => {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const act = b.dataset.act, i = pages.indexOf(p);
     if (act === 'corners') { if (p.ready && p.status !== 'detecting') openEditor(p); return; }
+    if (act === 'adjust') { if (p.ready && p.status !== 'detecting') openAdjust(p); return; }
     if (act === 'rotl') p.rot = (p.rot + 270) % 360;
     if (act === 'rotr') p.rot = (p.rot + 90) % 360;
     if (act === 'flip') p.flip = !p.flip;
@@ -1050,7 +1082,9 @@ function mountPage(p) {
     if (act === 'enhance') { Object.assign(p.adj, { levels: true, contrast: 12, saturation: 10, sharpen: 40, shadows: 15 }); syncAdj(p); }
     if (act === 'all') { pages.forEach(q => { if (q !== p) { const pad = q.adj.pad; q.adj = { ...p.adj, pad }; if (q.el) { syncAdj(q); refreshPage(q); } } }); toast('Adjustments applied to all cards'); }
     refreshPage(p, ['rotl', 'rotr', 'flip'].includes(act)); schedulePreview();
-  });
+  };
+  el.addEventListener('click', onAct);
+  el.querySelector('.adj-body').addEventListener('click', e => { e.stopPropagation(); onAct(e); });
   el.querySelectorAll('input[type=range][data-k]').forEach(r => {
     r.addEventListener('input', () => { p.adj[r.dataset.k] = +r.value; syncAdj(p, true); refreshPageSoon(p); });
   });
@@ -1060,13 +1094,14 @@ function mountPage(p) {
   return el;
 }
 function syncAdj(p, outputsOnly) {
-  const el = p.el; if (!el) return;
+  const el0 = p.el; if (!el0) return;
+  const el = el0.querySelector('.adj-body') || $('#aeScroll .adj-body');
   el.querySelectorAll('input[type=range][data-k]').forEach(r => { const k = r.dataset.k; if (!outputsOnly) r.value = p.adj[k]; el.querySelector(`output[data-o=${k}]`).textContent = k === 'pad' ? (p.adj[k] > 0 ? '+' : '') + p.adj[k] + '%' : k === 'bw' ? p.adj[k] : (p.adj[k] > 0 && k !== 'sharpen' ? '+' : '') + p.adj[k]; });
   el.querySelector('[data-wrap=bw]').hidden = p.adj.mode !== 'bw';
   el.querySelector('input[data-k=levels]').checked = p.adj.levels;
   el.querySelectorAll('.seg[data-k=mode] button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === p.adj.mode));
   const n = Object.keys(ADJ0).filter(k => p.adj[k] !== ADJ0[k]).length;
-  el.querySelector('.changed').textContent = n ? `${n} change${n > 1 ? 's' : ''}` : '';
+  el0.querySelector('.changed').textContent = n ? `${n} change${n > 1 ? 's' : ''}` : '';
 }
 const rafs = new Map();
 function refreshPageSoon(p) {
@@ -1097,6 +1132,7 @@ function refreshPage(p, animate) {
   box.classList.remove('scanning');
   const c = renderCard(p, clamp(bw / w, 1, 7.5));
   rc.width = c.width; rc.height = c.height; rc.getContext('2d').drawImage(c, 0, 0);
+  if (AE.p === p) drawAdjust();
   if (animate && !REDUCED) { box.classList.remove('settle'); void box.offsetWidth; box.classList.add('settle'); }
 }
 // the raw photo, shown while the card is being found
@@ -1222,6 +1258,50 @@ function loadCV() {
   s.onerror = () => { clearTimeout(timer); fail(); };
   document.head.appendChild(s);
 }
+
+// ---------- adjust sheet ----------
+const AE = { p: null, cmp: false };
+function openAdjust(p) {
+  AE.p = p; AE.cmp = false;
+  const ae = $('#ae'); ae.classList.remove('closing'); ae.hidden = false; $('#aeTitle').textContent = 'Adjust · ' + (p.name || 'Card');
+  $('#aeScroll').appendChild(p.el.querySelector('.adj-body'));
+  $('#aeScroll').scrollTop = 0; document.body.style.overflow = 'hidden';
+  requestAnimationFrame(drawAdjust);
+}
+function closeAdjust() {
+  const p = AE.p; if (!p) return; AE.p = null;
+  p.el.querySelector('.adj-holder').appendChild($('#aeScroll .adj-body'));
+  const ae = $('#ae'); document.body.style.overflow = '';
+  if (REDUCED) ae.hidden = true; else { ae.classList.add('closing'); setTimeout(() => { ae.hidden = true; ae.classList.remove('closing'); }, 200); }
+  refreshPage(p); schedulePreview();
+}
+let aeRaf = 0;
+function drawAdjust() {
+  if (!AE.p || aeRaf) return;
+  aeRaf = requestAnimationFrame(() => {
+    aeRaf = 0; const p = AE.p; if (!p) return;
+    const view = $('#aeView'), dpr = Math.min(2, window.devicePixelRatio || 1);
+    const [w, h] = finalMM(p), vw = view.clientWidth - 32, vh = view.clientHeight - 28;
+    const ppm = clamp(Math.min(vw / w, vh / h) * dpr, 1, 18);
+    let c;
+    if (AE.cmp) { const keep = p.adj; p.adj = { ...ADJ0, pad: keep.pad, sharpen: 0 }; c = renderCard(p, ppm); p.adj = keep; }
+    else c = renderCard(p, ppm);
+    const cv2d = $('#aeCanvas'); cv2d.width = c.width; cv2d.height = c.height;
+    cv2d.style.width = Math.round(c.width / dpr) + 'px'; cv2d.style.height = Math.round(c.height / dpr) + 'px';
+    cv2d.getContext('2d').drawImage(c, 0, 0);
+    $('#aeLabel').hidden = !AE.cmp; $('#aeCmp').classList.toggle('on', AE.cmp);
+  });
+}
+(() => {
+  $('#aeDone').onclick = closeAdjust;
+  $('#aeReset').onclick = () => { const p = AE.p; if (!p) return; const pad = p.adj.pad; p.adj = { ...ADJ0, pad }; syncAdj(p); refreshPage(p); schedulePreview(); };
+  const cmp = $('#aeCmp');
+  const on = e => { e.preventDefault(); AE.cmp = true; drawAdjust(); }, off = () => { if (!AE.cmp) return; AE.cmp = false; drawAdjust(); };
+  cmp.addEventListener('pointerdown', on); cmp.addEventListener('pointerup', off); cmp.addEventListener('pointerleave', off); cmp.addEventListener('pointercancel', off);
+  cmp.addEventListener('contextmenu', e => e.preventDefault());
+  window.addEventListener('keydown', e => { if (AE.p && e.key === 'Escape') closeAdjust(); });
+  window.addEventListener('resize', () => { if (AE.p) drawAdjust(); });
+})();
 
 // ---------- corner editor ----------
 const E = { p: null, q: null, q0: null, sel: -1, drag: null, view: null };
