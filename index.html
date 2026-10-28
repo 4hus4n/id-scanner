@@ -377,7 +377,7 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
 <header class="appbar">
   <div class="appbar-in">
     <a class="brand" href="./" id="brandHome" title="Start over" aria-label="IdScanner, start over"><div class="brand-mark" aria-hidden="true"></div><div style="min-width:0"><h1>IdScanner</h1><div class="tag">Photo of a card in, flat scan out</div></div></a>
-    <span class="cvstat loading" id="cvstat">Loading finder</span>
+    <span class="cvstat loading" id="cvstat">Loading AI finder</span>
   </div>
   <div class="holo" aria-hidden="true"></div>
 </header>
@@ -1300,13 +1300,148 @@ async function addFiles(files) {
   }
   schedulePreview(10);
 }
-function detectQuad(p) {
+// ---------- card finder ----------
+// Main: DocAligner (Apache-2.0, DocsaidLab) neural corner model via ONNX Runtime Web.
+// Fallback: the OpenCV edge/shape detector, loaded only if the model cannot start.
+const ORT_VER = '1.20.1';
+const ORT_CDN = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VER}/dist/`;
+const MODEL_URL = 'models/docaligner-lcnet100.onnx';
+let engine = null, aiSess = null;
+function setStat(txt, cls, title) { const st = $('#cvstat'); st.textContent = txt; st.className = 'cvstat ' + cls; st.title = title || ''; }
+function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.async = true; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src)); document.head.appendChild(s); }); }
+function detectorReady(name) {
+  engine = name; cvState = 'ready';
+  setStat(name === 'ai' ? 'AI detect ready' : 'Auto-detect ready', 'ok', name === 'ai' ? 'DocAligner corner model' : 'Edge detector');
+  pages.filter(p => p.status === 'waiting').forEach(p => runDetect(p));
+}
+async function loadAI() {
+  setStat('Loading AI finder', 'loading');
+  try {
+    if (!window.ort) await loadScript(ORT_CDN + 'ort.wasm.min.js');
+    ort.env.wasm.numThreads = 1;
+    ort.env.wasm.wasmPaths = { mjs: ORT_CDN + 'ort-wasm-simd-threaded.mjs', wasm: new URL('vendor/ort/ort-wasm-simd-threaded.wasm', location.href).href };
+    let wasmOk = true;
+    try { const r = await fetch(ort.env.wasm.wasmPaths.wasm, { method: 'HEAD' }); wasmOk = r.ok; } catch (e) { wasmOk = false; }
+    if (!wasmOk) ort.env.wasm.wasmPaths = ORT_CDN;
+    aiSess = await ort.InferenceSession.create(MODEL_URL, { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
+    detectorReady('ai');
+  } catch (e) {
+    console.warn('AI finder unavailable, using edge detector', e);
+    aiSess = null; loadCV();
+  }
+}
+// grayscale + Sobel gradients at working size, for edge snapping
+function gradientsOf(img) {
+  const W = img.width, H = img.height, d = img.data, g = new Float32Array(W * H), b = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  const P = (a, x, y) => a[(y < 0 ? 0 : y >= H ? H - 1 : y) * W + (x < 0 ? 0 : x >= W ? W - 1 : x)];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
+    b[y * W + x] = (4 * P(g, x, y) + 2 * (P(g, x - 1, y) + P(g, x + 1, y) + P(g, x, y - 1) + P(g, x, y + 1)) + P(g, x - 1, y - 1) + P(g, x + 1, y - 1) + P(g, x - 1, y + 1) + P(g, x + 1, y + 1)) / 16;
+  const gx = new Float32Array(W * H), gy = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    gx[y * W + x] = ((P(b, x + 1, y - 1) + 2 * P(b, x + 1, y) + P(b, x + 1, y + 1)) - (P(b, x - 1, y - 1) + 2 * P(b, x - 1, y) + P(b, x - 1, y + 1))) / 4;
+    gy[y * W + x] = ((P(b, x - 1, y + 1) + 2 * P(b, x, y + 1) + P(b, x + 1, y + 1)) - (P(b, x - 1, y - 1) + 2 * P(b, x, y - 1) + P(b, x + 1, y - 1))) / 4;
+  }
+  return { gx, gy };
+}
+// small search: nudge each side onto the strongest straight edge within ~1% of the image
+function snapFine(gx, gy, W, H, q, big) {
+  const R = Math.max(2, Math.floor(0.012 * big)), lines = [];
+  for (let i = 0; i < 4; i++) {
+    const a = q[i], b = q[(i + 1) % 4], mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], L = Math.hypot(b[0] - a[0], b[1] - a[1]), t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+    if (onBorder(a, b, W, H, big)) { lines.push([mid, t]); continue; }
+    let best = -1, bl = [mid, t];
+    for (let deg = -2; deg <= 2; deg++) {
+      const an = deg * Math.PI / 180, ca = Math.cos(an), sa = Math.sin(an), tt = [t[0] * ca - t[1] * sa, t[0] * sa + t[1] * ca], n = [tt[1], -tt[0]];
+      for (let o = -R; o <= R; o++) {
+        let sum = 0;
+        for (let k = 0; k < 32; k++) {
+          const f = (-0.42 + 0.84 * k / 31) * L, x = Math.round(mid[0] + f * tt[0] + o * n[0]), y = Math.round(mid[1] + f * tt[1] + o * n[1]);
+          if (x < 0 || y < 0 || x >= W || y >= H) continue;
+          const j = y * W + x, v = Math.abs(gx[j] * n[0] + gy[j] * n[1]); sum += v < 40 ? v : 40;
+        }
+        const s = sum / 32 - 0.02 * Math.abs(o);
+        if (s > best) { best = s; bl = [[mid[0] + o * n[0], mid[1] + o * n[1]], tt]; }
+      }
+    }
+    lines.push(bl);
+  }
+  return q.map((qi, i) => {
+    const [p1, d1] = lines[(i + 3) % 4], [p2, d2] = lines[i], det = d1[0] * -d2[1] + d2[0] * d1[1];
+    if (Math.abs(det) < 1e-9) return qi;
+    const bx = p2[0] - p1[0], by = p2[1] - p1[1], t1 = (bx * -d2[1] + d2[0] * by) / det, p = [p1[0] + d1[0] * t1, p1[1] + d1[1] * t1];
+    return Math.hypot(p[0] - qi[0], p[1] - qi[1]) < 0.05 * big ? p : qi;
+  });
+}
+async function aiDetect(img, srcCanvas) {
+  const W = img.width, H = img.height, S = 256;
+  const c = document.createElement('canvas'); c.width = S; c.height = S;
+  const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high';
+  // downscale in halving steps for a clean, alias-free 256×256 input
+  let cur = srcCanvas;
+  while (cur.width > S * 2 || cur.height > S * 2) { const n = document.createElement('canvas'); n.width = Math.max(S, Math.round(cur.width / 2)); n.height = Math.max(S, Math.round(cur.height / 2)); const nx = n.getContext('2d'); nx.imageSmoothingQuality = 'high'; nx.drawImage(cur, 0, 0, n.width, n.height); cur = n; }
+  x.drawImage(cur, 0, 0, S, S);
+  const px = x.getImageData(0, 0, S, S).data, inp = new Float32Array(3 * S * S);
+  for (let i = 0; i < S * S; i++) { inp[i] = px[i * 4] / 255; inp[S * S + i] = px[i * 4 + 1] / 255; inp[2 * S * S + i] = px[i * 4 + 2] / 255; }
+  const out = await aiSess.run({ img: new ort.Tensor('float32', inp, [1, 3, S, S]) });
+  const hm = out[aiSess.outputNames[0]], [, C, h, w] = hm.dims, data = hm.data;
+  const pts = [], peaks = [];
+  for (let ch = 0; ch < Math.min(4, C); ch++) {
+    const off = ch * h * w; let mx = 0;
+    const mask = new Uint8Array(h * w);
+    for (let i = 0; i < h * w; i++) { const v = data[off + i]; if (v > mx) mx = v; if (v >= 0.3) mask[i] = 1; }
+    peaks.push(mx);
+    // largest blob above threshold → its centroid
+    const seen = new Uint8Array(h * w); let bestN = 0, bx = 0, by = 0;
+    for (let i = 0; i < h * w; i++) {
+      if (!mask[i] || seen[i]) continue;
+      const st = [i]; seen[i] = 1; let n = 0, sx = 0, sy = 0;
+      while (st.length) {
+        const j = st.pop(), jx = j % w, jy = (j / w) | 0; n++; sx += jx; sy += jy;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const nx = jx + dx, ny = jy + dy; if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const k = ny * w + nx; if (mask[k] && !seen[k]) { seen[k] = 1; st.push(k); }
+        }
+      }
+      if (n > bestN) { bestN = n; bx = sx / n; by = sy / n; }
+    }
+    if (!bestN) return null;
+    pts.push([(bx + 0.5) / w * W, (by + 0.5) / h * H]);
+  }
+  if (pts.length < 4) return null;
+  let q = orderQuad(pts);
+  if (!isConvex(q) || polyArea(q) < 0.01 * W * H) return null;
+  const { gx, gy } = gradientsOf(img), big = Math.max(W, H);
+  // The model sometimes stops at the white panel under a magnetic stripe (too wide for a card).
+  // Try stretching the short sides back to ID-card shape and keep whichever outline sits on real edges.
+  const edgeScore = qq => { const s = gradSupport(gx, gy, W, H, qq).sort((m, n) => m - n); return 0.4 * s[0] + 0.2 * s[1] + 0.4 * (s[0] + s[1] + s[2] + s[3]) / 4; };
+  let best = snapFine(gx, gy, W, H, q, big), bestS = edgeScore(best) * 1.15;
+  const sd = sides(q), qw = (sd[0] + sd[2]) / 2, qh = (sd[1] + sd[3]) / 2, ar = Math.max(qw, qh) / Math.min(qw, qh);
+  if (ar > 1.72 && ar < 3) {
+    const lng = qw >= qh ? [0, 1, 2, 3] : [1, 2, 3, 0], [a0, a1, a2, a3] = lng.map(k => q[k]), r = ar / CARD_AR - 1;
+    const v1 = [a2[0] - a1[0], a2[1] - a1[1]], v0 = [a3[0] - a0[0], a3[1] - a0[1]];
+    for (const nq of [[[a0[0] - v0[0] * r, a0[1] - v0[1] * r], [a1[0] - v1[0] * r, a1[1] - v1[1] * r], a2, a3], [a0, a1, [a2[0] + v1[0] * r, a2[1] + v1[1] * r], [a3[0] + v0[0] * r, a3[1] + v0[1] * r]]]) {
+      if (nq.some(pt => pt[0] < -0.02 * W || pt[1] < -0.02 * H || pt[0] > 1.02 * W || pt[1] > 1.02 * H)) continue;
+      const cq = snapFine(gx, gy, W, H, orderQuad(nq.map(pt => [clamp(pt[0], 0, W - 1), clamp(pt[1], 0, H - 1)])), big), s = edgeScore(cq);
+      if (s > bestS) { best = cq; bestS = s; }
+    }
+  }
+  return { quad: best, confidence: Math.min(...peaks) };
+}
+async function detectQuad(p) {
   const s = Math.min(1, 800 / Math.max(p.src.width, p.src.height));
   const c = document.createElement('canvas'); c.width = Math.round(p.src.width * s); c.height = Math.round(p.src.height * s);
   const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(p.src, 0, 0, c.width, c.height);
-  const r = detectCard(cv, x.getImageData(0, 0, c.width, c.height));
+  const img = x.getImageData(0, 0, c.width, c.height);
+  let r = null, low = false;
+  if (engine === 'ai') {
+    r = await aiDetect(img, p.src);
+    if (r) low = r.confidence < 0.45;
+  } else if (engine === 'cv') {
+    r = detectCard(cv, img); if (r) low = r.confidence < 0.02;
+  }
   if (!r) return null;
-  return { q: r.quad.map(([a, b]) => [clamp(a / s, 0, p.src.width - 1), clamp(b / s, 0, p.src.height - 1)]), conf: r.confidence };
+  return { q: r.quad.map(([a, b]) => [clamp(a / s, 0, p.src.width - 1), clamp(b / s, 0, p.src.height - 1)]), low };
 }
 let detectQueue = Promise.resolve();
 function runDetect(p) {
@@ -1314,9 +1449,12 @@ function runDetect(p) {
     if (cvState === 'loading') { p.status = 'waiting'; p.ready = true; refreshPage(p); schedulePreview(); return; }
     if (cvState === 'failed') { p.status = 'fallback'; p.ready = true; refreshPage(p); schedulePreview(); return; }
     p.status = 'detecting'; refreshPage(p);
+    const t0 = performance.now();
     await new Promise(r => requestAnimationFrame(() => setTimeout(r, 40)));
-    let r = null; try { r = detectQuad(p); } catch (e) { console.error(e); }
-    if (r) { p.quad = r.q; p.status = r.conf < 0.02 ? 'check' : 'auto'; p.cache = null; } else p.status = 'fallback';
+    let r = null; try { r = await detectQuad(p); } catch (e) { console.error(e); }
+    // keep the scan animation on screen long enough to read as a step
+    const wait = 700 - (performance.now() - t0); if (wait > 0 && !REDUCED) await new Promise(res => setTimeout(res, wait));
+    if (r) { p.quad = r.q; p.status = r.low ? 'check' : 'auto'; p.cache = null; } else p.status = 'fallback';
     p.el.querySelector('.scan').hidden = true;
     if (r) await revealQuad(p);
     p.ready = true; refreshPage(p, true); schedulePreview();
@@ -1325,12 +1463,12 @@ function runDetect(p) {
   return detectQueue;
 }
 
-// ---------- OpenCV loading ----------
+// ---------- OpenCV fallback ----------
 function loadCV() {
-  const st = $('#cvstat');
+  setStat('Loading finder', 'loading');
   const s = document.createElement('script');
   s.src = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js'; s.async = true;
-  const fail = () => { if (cvState === 'ready') return; cvState = 'failed'; st.textContent = 'Manual corners'; st.className = 'cvstat bad'; st.title = 'Auto-detect could not load. Set corners by hand.'; pages.filter(p => p.status === 'waiting').forEach(p => runDetect(p)); };
+  const fail = () => { if (cvState === 'ready') return; cvState = 'failed'; setStat('Manual corners', 'bad', 'Auto-detect could not load. Set corners by hand.'); pages.filter(p => p.status === 'waiting').forEach(p => runDetect(p)); };
   const timer = setTimeout(fail, 60000);
   s.onload = async () => {
     try {
@@ -1339,9 +1477,7 @@ function loadCV() {
         await new Promise(r => { const prev = m.onRuntimeInitialized; m.onRuntimeInitialized = () => { prev && prev(); r(); }; m.then(mm => { if (mm && mm.Mat) m = mm; r(); }); });
       } else if (!m.Mat) await new Promise(r => { m.onRuntimeInitialized = r; });
       if (!m || !m.Mat) throw new Error('OpenCV did not start');
-      cv = m; cvState = 'ready'; clearTimeout(timer);
-      st.textContent = 'Auto-detect ready'; st.className = 'cvstat ok';
-      pages.filter(p => p.status === 'waiting').forEach(p => runDetect(p));
+      cv = m; clearTimeout(timer); detectorReady('cv');
     } catch (e) { console.error(e); clearTimeout(timer); fail(); }
   };
   s.onerror = () => { clearTimeout(timer); fail(); };
@@ -1491,7 +1627,7 @@ function tweenQuad(to) {
   $('#edAuto').onclick = async () => {
     const b = $('#edAuto'); b.disabled = true; const old = b.lastChild.textContent; b.lastChild.textContent = 'Finding…';
     await new Promise(r => setTimeout(r, 30));
-    let r = null; try { r = detectQuad(E.p); } catch (e) { console.error(e); }
+    let r = null; try { r = await detectQuad(E.p); } catch (e) { console.error(e); }
     b.disabled = false; b.lastChild.textContent = old;
     if (r) tweenQuad(r.q); else toast('Could not find the card edges in this photo. Drag the corners instead.');
   };
@@ -1647,7 +1783,7 @@ function makeSample(back) {
 }
 
 
-syncSettings(); relist(); loadCV();
+syncSettings(); relist(); loadAI();
 // opening screen
 (() => {
   const sp = $('#splash'); let done = false;
