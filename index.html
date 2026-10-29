@@ -1417,8 +1417,20 @@ function snapFine(gx, gy, W, H, q, big) {
 let aiLock = Promise.resolve();
 function aiRun(feeds) { const r = aiLock.then(() => aiSess.run(feeds)); aiLock = r.catch(() => {}); return r; }
 // raw model corners for any drawable (canvas or video frame) of size W×H
-async function aiCorners(source, W, H) {
+async function aiCorners(source, W, H, mode = 'pad') {
   const S = 256;
+  // 'pad': keep the photo's shape, extend its edges to a square (tall phone frames would squash the card);
+  // 'squash': stretch the whole photo to a square
+  let map = (u, v) => [u * W, v * H];
+  if (mode === 'pad' && Math.abs(W - H) > 2) {
+    const m = Math.max(W, H), Q = Math.min(1024, m), k = Q / m, dw = W * k, dh = H * k, ox = (Q - dw) / 2, oy = (Q - dh) / 2;
+    const sq = document.createElement('canvas'); sq.width = Q; sq.height = Q;
+    const sx = sq.getContext('2d'); sx.imageSmoothingQuality = 'high';
+    sx.drawImage(source, 0, 0, W, H, ox, oy, dw, dh);
+    if (ox > 0) { sx.drawImage(source, 0, 0, 1, H, 0, oy, ox + 1, dh); sx.drawImage(source, W - 1, 0, 1, H, ox + dw - 1, oy, ox + 1, dh); }
+    if (oy > 0) { sx.drawImage(source, 0, 0, W, 1, ox, 0, dw, oy + 1); sx.drawImage(source, 0, H - 1, W, 1, ox, oy + dh - 1, dw, oy + 1); }
+    source = sq; map = (u, v) => [(u * Q - ox) / k, (v * Q - oy) / k]; W = Q; H = Q;
+  }
   const c = document.createElement('canvas'); c.width = S; c.height = S;
   const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high';
   // downscale in halving steps for a clean, alias-free 256×256 input
@@ -1450,33 +1462,42 @@ async function aiCorners(source, W, H) {
       if (n > bestN) { bestN = n; bx = sx / n; by = sy / n; }
     }
     if (!bestN) return null;
-    pts.push([(bx + 0.5) / w * W, (by + 0.5) / h * H]);
+    pts.push([(bx + 0.5) / w, (by + 0.5) / h]);
   }
   if (pts.length < 4) return null;
-  let q = orderQuad(pts);
-  if (!isConvex(q) || polyArea(q) < 0.01 * W * H) return null;
+  const q = orderQuad(pts.map(([u, v]) => map(u, v)));
+  if (!isConvex(q)) return null;
   return { q, peaks };
 }
 async function aiDetect(img, srcCanvas) {
   const W = img.width, H = img.height;
-  const ac = await aiCorners(srcCanvas, srcCanvas.width, srcCanvas.height);
+  // try both framings and keep the more confident one
+  let ac = null;
+  for (const mode of ['pad', 'squash']) {
+    const r = await aiCorners(srcCanvas, srcCanvas.width, srcCanvas.height, mode);
+    if (r && polyArea(r.q) > 0.01 * srcCanvas.width * srcCanvas.height && (!ac || Math.min(...r.peaks) > Math.min(...ac.peaks))) ac = r;
+  }
   if (!ac) return null;
   const k = W / srcCanvas.width, peaks = ac.peaks;
   let q = ac.q.map(v => [v[0] * k, v[1] * k]);
   const { gx, gy } = gradientsOf(img), big = Math.max(W, H);
-  // The model sometimes stops at the white panel under a magnetic stripe (too wide for a card).
-  // Try stretching the short sides back to ID-card shape and keep whichever outline sits on real edges.
+  // The model (and the edge snap) often stops at the black magnetic stripe and drops the thin white
+  // strip above it, especially for a white card on a white table. ID cards have a fixed shape, so an
+  // outline that is too wide is stretched back to card shape, toward whichever side has the better edge.
   const edgeScore = qq => { const s = gradSupport(gx, gy, W, H, qq).sort((m, n) => m - n); return 0.4 * s[0] + 0.2 * s[1] + 0.4 * (s[0] + s[1] + s[2] + s[3]) / 4; };
-  let best = snapFine(gx, gy, W, H, q, big), bestS = edgeScore(best) * 1.15;
-  const sd = sides(q), qw = (sd[0] + sd[2]) / 2, qh = (sd[1] + sd[3]) / 2, ar = Math.max(qw, qh) / Math.min(qw, qh);
-  if (ar > 1.72 && ar < 3) {
-    const lng = qw >= qh ? [0, 1, 2, 3] : [1, 2, 3, 0], [a0, a1, a2, a3] = lng.map(k => q[k]), r = ar / CARD_AR - 1;
+  const targetAR = S.size === 'id3' ? 125 / 88 : S.size === 'custom' ? Math.max(+S.cw || 85.6, +S.ch || 54) / Math.min(+S.cw || 85.6, +S.ch || 54) : CARD_AR;
+  let best = snapFine(gx, gy, W, H, q, big);
+  const sd = sides(best), qw = (sd[0] + sd[2]) / 2, qh = (sd[1] + sd[3]) / 2, ar = Math.max(qw, qh) / Math.min(qw, qh);
+  if (ar > targetAR * 1.04 && ar < targetAR * 2) {
+    const lng = qw >= qh ? [0, 1, 2, 3] : [1, 2, 3, 0], [a0, a1, a2, a3] = lng.map(k => best[k]), r = ar / targetAR - 1;
     const v1 = [a2[0] - a1[0], a2[1] - a1[1]], v0 = [a3[0] - a0[0], a3[1] - a0[1]];
+    let ext = null, extS = -1;
     for (const nq of [[[a0[0] - v0[0] * r, a0[1] - v0[1] * r], [a1[0] - v1[0] * r, a1[1] - v1[1] * r], a2, a3], [a0, a1, [a2[0] + v1[0] * r, a2[1] + v1[1] * r], [a3[0] + v0[0] * r, a3[1] + v0[1] * r]]]) {
-      if (nq.some(pt => pt[0] < -0.02 * W || pt[1] < -0.02 * H || pt[0] > 1.02 * W || pt[1] > 1.02 * H)) continue;
+      if (nq.some(pt => pt[0] < -0.03 * W || pt[1] < -0.03 * H || pt[0] > 1.03 * W || pt[1] > 1.03 * H)) continue;
       const cq = snapFine(gx, gy, W, H, orderQuad(nq.map(pt => [clamp(pt[0], 0, W - 1), clamp(pt[1], 0, H - 1)])), big), s = edgeScore(cq);
-      if (s > bestS) { best = cq; bestS = s; }
+      if (s > extS) { ext = cq; extS = s; }
     }
+    if (ext) best = ext;
   }
   return { quad: best, confidence: Math.min(...peaks) };
 }
