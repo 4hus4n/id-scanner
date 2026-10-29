@@ -336,6 +336,31 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
 @media (min-width:960px){.toast{bottom:24px}}
 .empty{padding:34px 16px;text-align:center;color:var(--muted);font-size:.92rem;animation:enter .4s var(--ease) both}
 
+
+/* ---------- live scanner ---------- */
+.ls{position:fixed;inset:0;z-index:80;background:#000;color:#fff;display:flex;flex-direction:column;animation:edIn .25s var(--ease) both;touch-action:none}
+.ls video,.ls canvas.ov{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ls canvas.ov{pointer-events:none}
+.ls-top,.ls-bot{position:relative;z-index:2;display:flex;align-items:center;gap:10px;padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}
+.ls-top{padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:10px;justify-content:space-between;background:linear-gradient(180deg,rgba(0,0,0,.55),transparent)}
+.ls-hint{position:relative;z-index:2;align-self:center;margin-top:6px;font-size:.92rem;font-weight:500;background:rgba(0,0,0,.45);padding:6px 12px;border-radius:99px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:opacity .2s}
+.ls-round{width:44px;height:44px;border-radius:50%;border:0;background:rgba(40,40,40,.65);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.ls-round svg{width:22px;height:22px}
+.ls-pill{border:0;border-radius:99px;padding:9px 14px;font-weight:600;font-size:.86rem;background:rgba(40,40,40,.65);color:#fff;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.ls-pill.on{background:#ffcc00;color:#1a1400}
+.ls-space{flex:1}
+.ls-bot{margin-top:auto;padding-top:16px;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px));justify-content:space-between;background:linear-gradient(0deg,rgba(0,0,0,.6),transparent)}
+.ls-shutter{width:74px;height:74px;border-radius:50%;border:4px solid #fff;background:transparent;padding:4px;cursor:pointer;flex:none}
+.ls-shutter i{display:block;width:100%;height:100%;border-radius:50%;background:#fff;transition:transform .12s}
+.ls-shutter:active i{transform:scale(.88)}
+.ls-thumb{width:56px;height:56px;border-radius:8px;border:2px solid rgba(255,255,255,.85);background:#222 center/cover no-repeat;position:relative;cursor:pointer;flex:none;padding:0;overflow:visible}
+.ls-thumb[data-n="0"]{visibility:hidden}
+.ls-thumb b{position:absolute;right:-8px;top:-8px;min-width:22px;height:22px;border-radius:11px;background:#ffcc00;color:#1a1400;font:700 .74rem/22px var(--f-body);text-align:center;padding:0 5px}
+.ls-done{min-width:76px;justify-content:center}
+.ls-flash{position:absolute;inset:0;background:#fff;z-index:3;pointer-events:none;animation:lsFlash .35s ease-out both}
+.ls-fly{position:fixed;z-index:4;pointer-events:none;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.5);transform-origin:top left}
+@keyframes lsFlash{from{opacity:.75}to{opacity:0}}
+
 /* ---------- corner editor ---------- */
 .ed{position:fixed;inset:0;z-index:50;background:#0b0f0e;display:flex;flex-direction:column;color:#e9efed;padding-top:env(safe-area-inset-top,0px);animation:edIn .32s var(--ease) both}
 .ed.closing{animation:edOut .22s var(--ease) both}
@@ -515,6 +540,21 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
   <div class="ae-body">
     <div class="ae-view" id="aeView"><canvas id="aeCanvas"></canvas><span class="ae-label" id="aeLabel" hidden>Original</span><button class="ae-cmp" id="aeCmp">Hold to compare</button></div>
     <div class="ae-scroll" id="aeScroll"></div>
+  </div>
+</div>
+
+<div class="ls" id="ls" hidden role="dialog" aria-modal="true" aria-label="Scan cards with the camera">
+  <video id="lsVideo" playsinline muted autoplay></video>
+  <canvas class="ov" id="lsOv"></canvas>
+  <div class="ls-top">
+    <button class="ls-round" id="lsClose" aria-label="Close camera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <button class="ls-pill on" id="lsAuto" aria-pressed="true">Auto</button>
+  </div>
+  <div class="ls-hint" id="lsHint">Position the card in view</div>
+  <div class="ls-bot">
+    <button class="ls-thumb" id="lsThumb" data-n="0" aria-label="Finish and review"><b id="lsCount">0</b></button>
+    <button class="ls-shutter" id="lsShutter" aria-label="Capture"><i></i></button>
+    <button class="ls-pill ls-done" id="lsDone">Done</button>
   </div>
 </div>
 
@@ -1286,7 +1326,7 @@ async function addCanvas(src, opts = {}) {
   const iw = src.width, ih = src.height, m = 0.08;
   p.quad = [[iw * m, ih * m], [iw * (1 - m), ih * m], [iw * (1 - m), ih * (1 - m)], [iw * m, ih * (1 - m)]];
   pages.push(p); mountPage(p); relist(); refreshPage(p);
-  if (!opts.sample) setTimeout(() => p.el && p.el.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'center' }), 60);
+  if (!opts.sample && !opts.quiet) setTimeout(() => p.el && p.el.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'center' }), 60);
   await runDetect(p);
   return p;
 }
@@ -1373,17 +1413,21 @@ function snapFine(gx, gy, W, H, q, big) {
     return Math.hypot(p[0] - qi[0], p[1] - qi[1]) < 0.05 * big ? p : qi;
   });
 }
-async function aiDetect(img, srcCanvas) {
-  const W = img.width, H = img.height, S = 256;
+// one inference at a time (the live camera and photo jobs share the model)
+let aiLock = Promise.resolve();
+function aiRun(feeds) { const r = aiLock.then(() => aiSess.run(feeds)); aiLock = r.catch(() => {}); return r; }
+// raw model corners for any drawable (canvas or video frame) of size W×H
+async function aiCorners(source, W, H) {
+  const S = 256;
   const c = document.createElement('canvas'); c.width = S; c.height = S;
   const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high';
   // downscale in halving steps for a clean, alias-free 256×256 input
-  let cur = srcCanvas;
-  while (cur.width > S * 2 || cur.height > S * 2) { const n = document.createElement('canvas'); n.width = Math.max(S, Math.round(cur.width / 2)); n.height = Math.max(S, Math.round(cur.height / 2)); const nx = n.getContext('2d'); nx.imageSmoothingQuality = 'high'; nx.drawImage(cur, 0, 0, n.width, n.height); cur = n; }
+  let cur = source, cw = W, ch0 = H;
+  while (cw > S * 2 || ch0 > S * 2) { const n = document.createElement('canvas'); n.width = Math.max(S, Math.round(cw / 2)); n.height = Math.max(S, Math.round(ch0 / 2)); cw = n.width; ch0 = n.height; const nx = n.getContext('2d'); nx.imageSmoothingQuality = 'high'; nx.drawImage(cur, 0, 0, n.width, n.height); cur = n; }
   x.drawImage(cur, 0, 0, S, S);
   const px = x.getImageData(0, 0, S, S).data, inp = new Float32Array(3 * S * S);
   for (let i = 0; i < S * S; i++) { inp[i] = px[i * 4] / 255; inp[S * S + i] = px[i * 4 + 1] / 255; inp[2 * S * S + i] = px[i * 4 + 2] / 255; }
-  const out = await aiSess.run({ img: new ort.Tensor('float32', inp, [1, 3, S, S]) });
+  const out = await aiRun({ img: new ort.Tensor('float32', inp, [1, 3, S, S]) });
   const hm = out[aiSess.outputNames[0]], [, C, h, w] = hm.dims, data = hm.data;
   const pts = [], peaks = [];
   for (let ch = 0; ch < Math.min(4, C); ch++) {
@@ -1411,6 +1455,14 @@ async function aiDetect(img, srcCanvas) {
   if (pts.length < 4) return null;
   let q = orderQuad(pts);
   if (!isConvex(q) || polyArea(q) < 0.01 * W * H) return null;
+  return { q, peaks };
+}
+async function aiDetect(img, srcCanvas) {
+  const W = img.width, H = img.height;
+  const ac = await aiCorners(srcCanvas, srcCanvas.width, srcCanvas.height);
+  if (!ac) return null;
+  const k = W / srcCanvas.width, peaks = ac.peaks;
+  let q = ac.q.map(v => [v[0] * k, v[1] * k]);
   const { gx, gy } = gradientsOf(img), big = Math.max(W, H);
   // The model sometimes stops at the white panel under a magnetic stripe (too wide for a card).
   // Try stretching the short sides back to ID-card shape and keep whichever outline sits on real edges.
@@ -1526,6 +1578,140 @@ function drawAdjust() {
   cmp.addEventListener('contextmenu', e => e.preventDefault());
   window.addEventListener('keydown', e => { if (AE.p && e.key === 'Escape') closeAdjust(); });
   window.addEventListener('resize', () => { if (AE.p) drawAdjust(); });
+})();
+
+// ---------- live scanner (camera + AI overlay + auto capture) ----------
+const LS = { on: false, stream: null, target: null, disp: null, alpha: 0, hist: [], lostAt: 0, armed: true, capQ: null, busy: false, auto: true, n: 0, stableSince: 0, capturing: false };
+function lsHint(txt) { const h = $('#lsHint'); if (h.textContent !== txt) h.textContent = txt; }
+async function openScanner() {
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { $('#cam').click(); return; }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 3840 }, height: { ideal: 2160 } } });
+  } catch (e) {
+    console.warn(e); toast('Camera not available here. Opening the camera app instead.'); $('#cam').click(); return;
+  }
+  Object.assign(LS, { on: true, stream, target: null, disp: null, alpha: 0, hist: [], armed: true, capQ: null, n: 0, stableSince: 0, capturing: false });
+  const v = $('#lsVideo'); v.srcObject = stream;
+  $('#ls').hidden = false; document.body.style.overflow = 'hidden';
+  $('#lsThumb').dataset.n = '0'; $('#lsThumb').style.backgroundImage = ''; $('#lsCount').textContent = '0';
+  $('#lsAuto').hidden = engine !== 'ai';
+  try { await v.play(); } catch (e) {}
+  lsHint(engine === 'ai' ? 'Position the card in view' : 'Tap the shutter to capture');
+  requestAnimationFrame(lsDraw); lsTick();
+}
+function closeScanner() {
+  if (!LS.on) return; LS.on = false;
+  if (LS.stream) LS.stream.getTracks().forEach(tr => tr.stop()); LS.stream = null;
+  $('#lsVideo').srcObject = null; $('#ls').hidden = true; document.body.style.overflow = '';
+  const last = pages[pages.length - 1]; if (LS.n && last && last.el) setTimeout(() => last.el.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'center' }), 80);
+}
+// video coordinates → screen coordinates (video uses object-fit: cover)
+function lsMap() {
+  const v = $('#lsVideo'), vw = v.videoWidth, vh = v.videoHeight, sw = v.clientWidth, sh = v.clientHeight;
+  const s = Math.max(sw / vw, sh / vh); return { s, ox: (sw - vw * s) / 2, oy: (sh - vh * s) / 2, sw, sh };
+}
+async function lsTick() {
+  if (!LS.on) return;
+  const v = $('#lsVideo');
+  if (engine === 'ai' && aiSess && !LS.busy && !LS.capturing && v.videoWidth && v.readyState >= 2) {
+    LS.busy = true;
+    let r = null; try { r = await aiCorners(v, v.videoWidth, v.videoHeight); } catch (e) { console.warn(e); }
+    LS.busy = false;
+    lsUpdate(r && Math.min(...r.peaks) >= 0.4 ? r.q : null, performance.now(), v);
+  }
+  setTimeout(lsTick, 50);
+}
+function lsUpdate(q, now, v) {
+  const diag = Math.hypot(v.videoWidth, v.videoHeight);
+  if (!q) {
+    if (!LS.lostAt) LS.lostAt = now;
+    if (now - LS.lostAt > 350) { LS.target = null; LS.hist = []; LS.stableSince = 0; }
+    if (now - LS.lostAt > 600) LS.armed = true;     // card left the view: ready for the next one
+    if (!LS.capturing) lsHint(LS.n ? 'Position the next side in view' : 'Position the card in view');
+    return;
+  }
+  LS.lostAt = 0; LS.target = q;
+  // a clearly different card position also re-arms auto capture
+  if (!LS.armed && LS.capQ) { const mv = Math.max(...q.map((p, i) => Math.hypot(p[0] - LS.capQ[i][0], p[1] - LS.capQ[i][1]))); if (mv > 0.22 * diag) LS.armed = true; }
+  LS.hist.push({ t: now, q }); while (LS.hist.length && now - LS.hist[0].t > 1200) LS.hist.shift();
+  const span = LS.hist.length ? now - LS.hist[0].t : 0;
+  const still = LS.hist.every(h => h.q.every((p, i) => Math.hypot(p[0] - q[i][0], p[1] - q[i][1]) < 0.022 * diag));
+  if (!still) { LS.hist = [{ t: now, q }]; LS.stableSince = 0; }
+  else if (!LS.stableSince) LS.stableSince = now;
+  if (!LS.auto || !LS.armed) { lsHint(LS.armed ? 'Tap the shutter to capture' : (LS.n === 1 ? 'Now turn the card over' : 'Move to the next card')); return; }
+  const held = LS.stableSince ? now - LS.stableSince : 0;
+  lsHint(held > 150 ? 'Scanning… hold still' : 'Hold steady');
+  if (still && span >= 650 && held >= 650 && !LS.capturing) lsCapture(false);
+}
+function lsDraw() {
+  if (!LS.on) return;
+  const cv2d = $('#lsOv'), v = $('#lsVideo'), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = cv2d.clientWidth, H = cv2d.clientHeight;
+  if (cv2d.width !== Math.round(W * dpr)) { cv2d.width = Math.round(W * dpr); cv2d.height = Math.round(H * dpr); }
+  const x = cv2d.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+  if (v.videoWidth) {
+    const m = lsMap();
+    if (LS.target) {
+      const tq = LS.target.map(p => [m.ox + p[0] * m.s, m.oy + p[1] * m.s]);
+      LS.disp = LS.disp ? LS.disp.map((p, i) => [p[0] + (tq[i][0] - p[0]) * 0.35, p[1] + (tq[i][1] - p[1]) * 0.35]) : tq;
+      LS.alpha = Math.min(1, LS.alpha + 0.12);
+    } else LS.alpha = Math.max(0, LS.alpha - 0.08);
+    if (LS.disp && LS.alpha > 0.01) {
+      const held = LS.stableSince && LS.armed && LS.auto ? Math.min(1, (performance.now() - LS.stableSince) / 650) : 0;
+      x.save(); x.globalAlpha = LS.alpha; x.lineJoin = 'round';
+      x.beginPath(); LS.disp.forEach((p, i) => i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); x.closePath();
+      x.fillStyle = `rgba(255,204,0,${0.18 + 0.22 * held})`; x.fill();
+      x.lineWidth = 2.5; x.strokeStyle = 'rgba(255,214,10,.95)'; x.stroke(); x.restore();
+    }
+  }
+  requestAnimationFrame(lsDraw);
+}
+async function lsCapture(manual) {
+  if (LS.capturing || !LS.on) return;
+  const v = $('#lsVideo'); if (!v.videoWidth) return;
+  LS.capturing = true;
+  const vw = v.videoWidth, vh = v.videoHeight, k = Math.min(1, 3200 / Math.max(vw, vh));
+  const c = document.createElement('canvas'); c.width = Math.round(vw * k); c.height = Math.round(vh * k);
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  const q = LS.target ? LS.target.map(p => p.slice()) : null;
+  if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) {}
+  const fl = document.createElement('div'); fl.className = 'ls-flash'; $('#ls').appendChild(fl); setTimeout(() => fl.remove(), 400);
+  // quick flattened preview flies into the thumbnail
+  const m = lsMap(), thumb = $('#lsThumb'), tr = thumb.getBoundingClientRect();
+  const pv = document.createElement('canvas');
+  if (q) {
+    const tmp = { src: c, data: null, quad: q.map(p => [p[0] * k, p[1] * k]), adj: { pad: 0 } };
+    const sw = Math.min(c.width, 1024), sh = Math.round(sw * c.height / c.width);
+    const small = document.createElement('canvas'); small.width = sw; small.height = sh; small.getContext('2d').drawImage(c, 0, 0, sw, sh);
+    tmp.src = small; tmp.data = small.getContext('2d').getImageData(0, 0, sw, sh); tmp.quad = q.map(p => [p[0] * sw / vw, p[1] * sh / vh]);
+    const [qw, qh] = quadDims(tmp.quad), land = qw >= qh;
+    const ow = land ? 342 : 216, oh = land ? 216 : 342;
+    pv.width = ow; pv.height = oh; pv.getContext('2d').putImageData(warp(tmp, ow, oh), 0, 0);
+  } else { pv.width = 320; pv.height = Math.round(320 * vh / vw); pv.getContext('2d').drawImage(c, 0, 0, pv.width, pv.height); }
+  const r0 = q ? (() => { const xs = q.map(p => m.ox + p[0] * m.s), ys = q.map(p => m.oy + p[1] * m.s); const l = Math.min(...xs), t0 = Math.min(...ys); return { l, t: t0, w: Math.max(...xs) - l, h: Math.max(...ys) - t0 }; })() : { l: 0, t: 0, w: m.sw, h: m.sh };
+  const fly = document.createElement('canvas'); fly.className = 'ls-fly'; fly.width = pv.width; fly.height = pv.height; fly.getContext('2d').drawImage(pv, 0, 0);
+  const fw = Math.min(r0.w, m.sw * 0.86), fh = fw * pv.height / pv.width;
+  Object.assign(fly.style, { left: (r0.l + (r0.w - fw) / 2) + 'px', top: (r0.t + (r0.h - fh) / 2) + 'px', width: fw + 'px', height: fh + 'px' });
+  document.body.appendChild(fly);
+  const sx = tr.width / fw, dx = tr.left - parseFloat(fly.style.left), dy = tr.top + (tr.height - fh * sx) / 2 - parseFloat(fly.style.top);
+  const anim = fly.animate([{ transform: 'none', opacity: 1 }, { transform: 'translate(0,-8px) scale(1.04)', opacity: 1, offset: .25 }, { transform: `translate(${dx}px,${dy}px) scale(${sx})`, opacity: .9 }], { duration: REDUCED ? 1 : 620, easing: 'cubic-bezier(.5,0,.2,1)' });
+  anim.onfinish = () => fly.remove();
+  setTimeout(() => {
+    LS.n++; thumb.dataset.n = String(LS.n); $('#lsCount').textContent = LS.n; thumb.style.backgroundImage = `url(${pv.toDataURL('image/jpeg', .8)})`;
+    thumb.animate([{ transform: 'scale(1.15)' }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  }, REDUCED ? 0 : 560);
+  LS.armed = false; LS.capQ = q; LS.stableSince = 0; LS.hist = [];
+  lsHint(LS.n === 0 ? 'Now turn the card over' : 'Move to the next card');
+  if (pages.some(pg => pg.sample)) { for (let i = pages.length - 1; i >= 0; i--) if (pages[i].sample) pages.splice(i, 1); relist(); }
+  setTimeout(() => { LS.capturing = false; }, 700);
+  addCanvas(c, { quiet: true }).then(() => schedulePreview(10));
+}
+(() => {
+  $('#lsClose').onclick = closeScanner; $('#lsDone').onclick = closeScanner; $('#lsThumb').onclick = closeScanner;
+  $('#lsShutter').onclick = () => lsCapture(true);
+  $('#lsAuto').onclick = () => { LS.auto = !LS.auto; const b = $('#lsAuto'); b.classList.toggle('on', LS.auto); b.textContent = LS.auto ? 'Auto' : 'Manual'; b.setAttribute('aria-pressed', LS.auto); };
+  window.addEventListener('keydown', e => { if (LS.on && e.key === 'Escape') closeScanner(); });
 })();
 
 // ---------- corner editor ----------
@@ -1718,9 +1904,9 @@ $('#mOut').onclick = () => $('#outPanel').scrollIntoView({ behavior: REDUCED ? '
 
 // ---------- input wiring ----------
 $('#addBtn').onclick = () => $('#file').click();
-$('#camBtn').onclick = () => $('#cam').click();
+$('#camBtn').onclick = openScanner;
 $('#brandHome').onclick = e => { e.preventDefault(); location.reload(); };
-$('#heroCam').onclick = () => $('#cam').click();
+$('#heroCam').onclick = openScanner;
 $('#heroGal').onclick = () => $('#file').click();
 $('#trySample').onclick = async () => {
   await addCanvas(makeSample(false), { sample: true, name: 'Front' });
