@@ -518,7 +518,8 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
         <div class="ctl" id="qualCtl"><label for="qual">JPG quality <output id="qualO"></output></label><input type="range" id="qual" min="50" max="100" value="92"></div>
         <div class="ctl"><label for="fname">File name</label><input type="text" class="f" id="fname" value="id-card" spellcheck="false" autocomplete="off"></div>
         <button class="btn primary export-main" id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span id="exportLbl">Save PDF</span></button>
-        <p class="fineprint">Everything runs in your browser. Photos never leave this device.</p>
+        <label class="check learn-opt" id="learnCtl" hidden><input type="checkbox" id="share" checked> Help improve auto-detect</label>
+        <p class="fineprint">Everything runs in your browser. Photos never leave this device.<span id="learnNote" hidden> When you save, IdScanner shares only edge measurements and which outline was right, never the photo or card details.</span></p>
       </div>
     </aside>
   </div>
@@ -897,7 +898,7 @@ const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce
 let cv = null, cvState = 'loading';
 const pages = [];
 let uid = 1;
-const S = { layout: 'stack', size: 'id1', cw: 85.6, ch: 54, fmt: 'pdf', dpi: 300, page: 'a4', gap: 6, margin: 5, round: true, guides: true, bg: 'white', bgColor: '#e8eceb', qual: 92, fname: 'id-card' };
+const S = { layout: 'stack', size: 'id1', cw: 85.6, ch: 54, fmt: 'pdf', dpi: 300, page: 'a4', gap: 6, margin: 5, round: true, guides: true, bg: 'white', bgColor: '#e8eceb', qual: 92, fname: 'id-card' , share: true};
 try { const saved = JSON.parse(localStorage.getItem('cardflat-settings') || 'null'); if (saved) Object.assign(S, saved); } catch (e) {}
 // older versions: page size lived in "card size" and a "print" layout
 if (S.size === 'a4' || S.size === 'letter') S.size = 'id1';
@@ -1351,7 +1352,7 @@ function setStat(txt, cls, title) { const st = $('#cvstat'); st.textContent = tx
 function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.async = true; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src)); document.head.appendChild(s); }); }
 function detectorReady(name) {
   engine = name; cvState = 'ready';
-  setStat(name === 'ai' ? 'AI detect ready' : 'Auto-detect ready', 'ok', name === 'ai' ? 'DocAligner corner model' : 'Edge detector');
+  setStat(name === 'ai' ? 'AI detect ready' : 'Auto-detect ready', 'ok', name === 'ai' ? 'DocAligner corner model · picker ' + (WEIGHTS.version ? 'v' + WEIGHTS.version + ' (learned)' : 'built-in') : 'Edge detector');
   pages.filter(p => p.status === 'waiting').forEach(p => runDetect(p));
 }
 async function loadAI() {
@@ -1469,37 +1470,83 @@ async function aiCorners(source, W, H, mode = 'pad') {
   if (!isConvex(q)) return null;
   return { q, peaks };
 }
+// ---------- learnable outline picker ----------
+// Each photo yields several possible outlines (two model framings, raw/snapped, stretched to card shape).
+// Every outline gets FEATS numbers; the outline with the highest weighted sum wins. The weights come
+// from the server, which learns them from everyone's corner corrections (see api/). Built-in = fallback.
+const FEAT_SCHEMA = 'f1';
+const FEATS = ['pk_min', 'pk_mean', 'edge_min', 'edge_2nd', 'edge_mean', 'con_min', 'con_2nd', 'con_mean', 'ar_dev', 'area', 'snapped', 'extended', 'pad', 'border', 'moved'];
+const W_BUILTIN = /*W_BUILTIN*/[0.06,0.04,0.19,0.1,0.15,-0.2,-0.31,-0.14,-0.05,0.0,0.31,0.69,0.26,-0.03,0.1]/*END*/;
+let WEIGHTS = { version: 0, schema: FEAT_SCHEMA, w: W_BUILTIN.slice(), source: 'built-in' };
+function scoreFeat(f) { let s = 0; for (let i = 0; i < f.length; i++) s += (WEIGHTS.w[i] || 0) * f[i]; return s; }
+// colour difference just inside vs just outside each side (median of 24 samples)
+function sideContrastRGB(img, q, big) {
+  const W = img.width, H = img.height, d = img.data;
+  const cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4, sh = Math.max(3, 0.018 * big);
+  const px = (x, y) => { let r = 0, g = 0, b = 0, n = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = (x + dx) | 0, Y = (y + dy) | 0; if (X < 0 || Y < 0 || X >= W || Y >= H) continue; const i = (Y * W + X) * 4; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } return n ? [r / n, g / n, b / n] : null; };
+  return [0, 1, 2, 3].map(i => {
+    const a = q[i], b = q[(i + 1) % 4], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+    let n = [t[1], -t[0]]; if (n[0] * ((a[0] + b[0]) / 2 - cx) + n[1] * ((a[1] + b[1]) / 2 - cy) < 0) n = [-n[0], -n[1]];
+    const dd = [];
+    for (let k = 0; k < 24; k++) {
+      const f = 0.15 + 0.7 * k / 23, p = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+      const pi = px(p[0] - n[0] * sh, p[1] - n[1] * sh), po = px(p[0] + n[0] * sh, p[1] + n[1] * sh);
+      if (pi && po) dd.push(Math.hypot(pi[0] - po[0], pi[1] - po[1], pi[2] - po[2]));
+    }
+    if (dd.length < 8) return 0;
+    dd.sort((x, y) => x - y); return dd[dd.length >> 1];
+  });
+}
+function candFeatures(img, gx, gy, q, raw, peaks, flags, targetAR) {
+  const W = img.width, H = img.height, big = Math.max(W, H), diag = Math.hypot(W, H);
+  const es = gradSupport(gx, gy, W, H, q).sort((m, n) => m - n), cs = sideContrastRGB(img, q, big).sort((m, n) => m - n);
+  const sd = sides(q), qw = (sd[0] + sd[2]) / 2, qh = (sd[1] + sd[3]) / 2, ar = Math.max(qw, qh) / Math.max(1e-6, Math.min(qw, qh));
+  const m = 0.004 * big, border = q.filter(([x, y]) => x < m || y < m || x > W - 1 - m || y > H - 1 - m).length;
+  const moved = q.reduce((s, p, i) => s + Math.hypot(p[0] - raw[i][0], p[1] - raw[i][1]), 0) / 4 / diag;
+  const c1 = v => Math.min(1, v), r3 = v => Math.round(v * 1000) / 1000;
+  return [
+    Math.min(...peaks), peaks.reduce((s, v) => s + v, 0) / peaks.length,
+    es[0], es[1], (es[0] + es[1] + es[2] + es[3]) / 4,
+    c1(cs[0] / 40), c1(cs[1] / 40), c1((cs[0] + cs[1] + cs[2] + cs[3]) / 160),
+    c1(Math.abs(Math.log(ar / targetAR))), Math.sqrt(polyArea(q) / (W * H)),
+    flags.snapped ? 1 : 0, flags.extended ? 1 : 0, flags.pad ? 1 : 0,
+    border / 4, c1(moved * 10)
+  ].map(r3);
+}
+function stretchToCard(q, targetAR, W, H) {
+  const sd = sides(q), qw = (sd[0] + sd[2]) / 2, qh = (sd[1] + sd[3]) / 2, ar = Math.max(qw, qh) / Math.min(qw, qh);
+  if (!(ar > targetAR * 1.04 && ar < targetAR * 2)) return [];
+  const lng = qw >= qh ? [0, 1, 2, 3] : [1, 2, 3, 0], [a0, a1, a2, a3] = lng.map(k => q[k]), r = ar / targetAR - 1;
+  const v1 = [a2[0] - a1[0], a2[1] - a1[1]], v0 = [a3[0] - a0[0], a3[1] - a0[1]], out = [];
+  for (const nq of [[[a0[0] - v0[0] * r, a0[1] - v0[1] * r], [a1[0] - v1[0] * r, a1[1] - v1[1] * r], a2, a3], [a0, a1, [a2[0] + v1[0] * r, a2[1] + v1[1] * r], [a3[0] + v0[0] * r, a3[1] + v0[1] * r]]]) {
+    if (nq.some(pt => pt[0] < -0.03 * W || pt[1] < -0.03 * H || pt[0] > 1.03 * W || pt[1] > 1.03 * H)) continue;
+    out.push(orderQuad(nq.map(pt => [clamp(pt[0], 0, W - 1), clamp(pt[1], 0, H - 1)])));
+  }
+  return out;
+}
 async function aiDetect(img, srcCanvas) {
-  const W = img.width, H = img.height;
-  // try both framings and keep the more confident one
-  let ac = null;
+  const W = img.width, H = img.height, big = Math.max(W, H), k = W / srcCanvas.width;
+  const { gx, gy } = gradientsOf(img);
+  const targetAR = S.size === 'id3' ? 125 / 88 : S.size === 'custom' ? Math.max(+S.cw || 85.6, +S.ch || 54) / Math.min(+S.cw || 85.6, +S.ch || 54) : CARD_AR;
+  const cands = [];
+  const add = (q, raw, peaks, flags) => {
+    if (!isConvex(q) || polyArea(q) < 0.01 * W * H) return;
+    if (cands.some(c => Math.max(...c.q.map((p, i) => Math.hypot(p[0] - q[i][0], p[1] - q[i][1]))) < 0.004 * big)) return;
+    cands.push({ q, f: candFeatures(img, gx, gy, q, raw, peaks, flags, targetAR), peaks });
+  };
   for (const mode of ['pad', 'squash']) {
     const r = await aiCorners(srcCanvas, srcCanvas.width, srcCanvas.height, mode);
-    if (r && polyArea(r.q) > 0.01 * srcCanvas.width * srcCanvas.height && (!ac || Math.min(...r.peaks) > Math.min(...ac.peaks))) ac = r;
+    if (!r) continue;
+    const raw = r.q.map(v => [v[0] * k, v[1] * k]), pad = mode === 'pad';
+    add(raw, raw, r.peaks, { pad });
+    const sn = snapFine(gx, gy, W, H, raw, big);
+    add(sn, raw, r.peaks, { pad, snapped: true });
+    for (const e of stretchToCard(sn, targetAR, W, H)) add(snapFine(gx, gy, W, H, e, big), raw, r.peaks, { pad, snapped: true, extended: true });
   }
-  if (!ac) return null;
-  const k = W / srcCanvas.width, peaks = ac.peaks;
-  let q = ac.q.map(v => [v[0] * k, v[1] * k]);
-  const { gx, gy } = gradientsOf(img), big = Math.max(W, H);
-  // The model (and the edge snap) often stops at the black magnetic stripe and drops the thin white
-  // strip above it, especially for a white card on a white table. ID cards have a fixed shape, so an
-  // outline that is too wide is stretched back to card shape, toward whichever side has the better edge.
-  const edgeScore = qq => { const s = gradSupport(gx, gy, W, H, qq).sort((m, n) => m - n); return 0.4 * s[0] + 0.2 * s[1] + 0.4 * (s[0] + s[1] + s[2] + s[3]) / 4; };
-  const targetAR = S.size === 'id3' ? 125 / 88 : S.size === 'custom' ? Math.max(+S.cw || 85.6, +S.ch || 54) / Math.min(+S.cw || 85.6, +S.ch || 54) : CARD_AR;
-  let best = snapFine(gx, gy, W, H, q, big);
-  const sd = sides(best), qw = (sd[0] + sd[2]) / 2, qh = (sd[1] + sd[3]) / 2, ar = Math.max(qw, qh) / Math.min(qw, qh);
-  if (ar > targetAR * 1.04 && ar < targetAR * 2) {
-    const lng = qw >= qh ? [0, 1, 2, 3] : [1, 2, 3, 0], [a0, a1, a2, a3] = lng.map(k => best[k]), r = ar / targetAR - 1;
-    const v1 = [a2[0] - a1[0], a2[1] - a1[1]], v0 = [a3[0] - a0[0], a3[1] - a0[1]];
-    let ext = null, extS = -1;
-    for (const nq of [[[a0[0] - v0[0] * r, a0[1] - v0[1] * r], [a1[0] - v1[0] * r, a1[1] - v1[1] * r], a2, a3], [a0, a1, [a2[0] + v1[0] * r, a2[1] + v1[1] * r], [a3[0] + v0[0] * r, a3[1] + v0[1] * r]]]) {
-      if (nq.some(pt => pt[0] < -0.03 * W || pt[1] < -0.03 * H || pt[0] > 1.03 * W || pt[1] > 1.03 * H)) continue;
-      const cq = snapFine(gx, gy, W, H, orderQuad(nq.map(pt => [clamp(pt[0], 0, W - 1), clamp(pt[1], 0, H - 1)])), big), s = edgeScore(cq);
-      if (s > extS) { ext = cq; extS = s; }
-    }
-    if (ext) best = ext;
-  }
-  return { quad: best, confidence: Math.min(...peaks) };
+  if (!cands.length) return null;
+  let pick = 0;
+  cands.forEach((c, i) => { c.s = scoreFeat(c.f); if (c.s > cands[pick].s) pick = i; });
+  return { quad: cands[pick].q, confidence: Math.min(...cands[pick].peaks), learn: { schema: FEAT_SCHEMA, wver: WEIGHTS.version, pick, cands: cands.map(c => ({ f: c.f, q: c.q })) } };
 }
 async function detectQuad(p) {
   const s = Math.min(1, 800 / Math.max(p.src.width, p.src.height));
@@ -1514,7 +1561,9 @@ async function detectQuad(p) {
     r = detectCard(cv, img); if (r) low = r.confidence < 0.02;
   }
   if (!r) return null;
-  return { q: r.quad.map(([a, b]) => [clamp(a / s, 0, p.src.width - 1), clamp(b / s, 0, p.src.height - 1)]), low };
+  const toSrc = q => q.map(([a, b]) => [clamp(a / s, 0, p.src.width - 1), clamp(b / s, 0, p.src.height - 1)]);
+  if (r.learn) { r.learn.cands.forEach(c => { c.q = toSrc(c.q); }); r.learn.w = p.src.width; r.learn.h = p.src.height; }
+  return { q: toSrc(r.quad), low, learn: r.learn || null };
 }
 let detectQueue = Promise.resolve();
 function runDetect(p) {
@@ -1527,13 +1576,56 @@ function runDetect(p) {
     let r = null; try { r = await detectQuad(p); } catch (e) { console.error(e); }
     // keep the scan animation on screen long enough to read as a step
     const wait = 700 - (performance.now() - t0); if (wait > 0 && !REDUCED) await new Promise(res => setTimeout(res, wait));
-    if (r) { p.quad = r.q; p.status = r.low ? 'check' : 'auto'; p.cache = null; } else p.status = 'fallback';
+    if (r) { p.quad = r.q; p.status = r.low ? 'check' : 'auto'; p.cache = null; p.learn = r.learn; p.learnSent = false; } else p.status = 'fallback';
     p.el.querySelector('.scan').hidden = true;
     if (r) await revealQuad(p);
     p.ready = true; refreshPage(p, true); schedulePreview();
   };
   detectQueue = detectQueue.then(job, job);
   return detectQueue;
+}
+
+// ---------- shared learning (see api/) ----------
+const LEARN = { api: (document.querySelector('meta[name="idscanner-api"]') || {}).content || 'api/', ok: false };
+function applyWeights(j, source) {
+  if (!j || j.schema !== FEAT_SCHEMA || !Array.isArray(j.w) || j.w.length !== FEATS.length || !j.w.every(Number.isFinite)) return false;
+  WEIGHTS = { version: +j.version || 0, schema: j.schema, w: j.w.map(Number), source };
+  return true;
+}
+async function loadWeights() {
+  try { applyWeights(JSON.parse(localStorage.getItem('idscanner-weights') || 'null'), 'cache'); } catch (e) {}
+  try {
+    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 6000);
+    const r = await fetch(LEARN.api + 'weights.php', { cache: 'no-cache', signal: ctl.signal });
+    clearTimeout(tm);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    LEARN.ok = true; $('#learnCtl').hidden = false; $('#learnNote').hidden = false;
+    if (applyWeights(j, 'server')) { try { localStorage.setItem('idscanner-weights', JSON.stringify(j)); } catch (e) {} }
+  } catch (e) { /* no learning server here (e.g. GitHub Pages) — built-in weights */ }
+}
+// overlap of two quads (0..1), sampled on a grid over their combined box
+function quadIoU(a, b) {
+  const xs = a.concat(b).map(p => p[0]), ys = a.concat(b).map(p => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), N = 120;
+  const inside = (q, x, y) => { let s = 0; for (let i = 0; i < 4; i++) { const p = q[i], n = q[(i + 1) % 4], c = (n[0] - p[0]) * (y - p[1]) - (n[1] - p[1]) * (x - p[0]); if (c !== 0) { const sg = Math.sign(c); if (!s) s = sg; else if (sg !== s) return false; } } return true; };
+  let I = 0, U = 0;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const x = x0 + (x1 - x0) * (i + 0.5) / N, y = y0 + (y1 - y0) * (j + 0.5) / N, A = inside(a, x, y), B = inside(b, x, y);
+    if (A && B) I++; if (A || B) U++;
+  }
+  return U ? I / U : 0;
+}
+// called after a successful save: the saved corners are the confirmed right answer
+function sendFeedback() {
+  if (!LEARN.ok || S.share === false) return;
+  const recs = pages.filter(p => p.learn && !p.learnSent && !p.sample && p.ready && p.learn.cands.length).map(p => {
+    p.learnSent = true;
+    const ious = p.learn.cands.map(c => Math.round(quadIoU(c.q, p.quad) * 1000) / 1000);
+    return { schema: p.learn.schema, wver: p.learn.wver, pick: p.learn.pick, edited: ious[p.learn.pick] < 0.985, feats: p.learn.cands.map(c => c.f), ious };
+  });
+  if (!recs.length) return;
+  try { fetch(LEARN.api + 'feedback.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ v: 1, records: recs }), keepalive: true }).catch(() => {}); } catch (e) {}
 }
 
 // ---------- OpenCV fallback ----------
@@ -1875,14 +1967,14 @@ async function doExport() {
         else doc.addPage([sh.wMM, sh.hMM], o);
         doc.addImage(url, 'JPEG', 0, 0, sh.wMM, sh.hMM, undefined, 'FAST');
       }
-      const ok = await saveBlob(base + '.pdf', doc.output('blob')); if (ok) toast('Saved ' + base + '.pdf');
+      const ok = await saveBlob(base + '.pdf', doc.output('blob')); if (ok) { toast('Saved ' + base + '.pdf'); sendFeedback(); }
     } else {
       const jpg = S.fmt === 'jpg';
       for (let i = 0; i < sheets.length; i++) {
         const c = drawSheet(sheets[i], ppm, jpg);
         const blob = await canvasBlob(c, jpg ? 'image/jpeg' : 'image/png', S.qual / 100);
         const nm = sheets.length > 1 ? `${base}-${(sheets[i].items[0].p.name || 'card-' + (i + 1)).toLowerCase().replace(/\s+/g, '-')}` : base;
-        const ok = await saveBlob(nm + (jpg ? '.jpg' : '.png'), blob); if (!ok) break; if (i === sheets.length - 1) toast(sheets.length > 1 ? `Saved ${sheets.length} images` : 'Saved ' + nm + (jpg ? '.jpg' : '.png'));
+        const ok = await saveBlob(nm + (jpg ? '.jpg' : '.png'), blob); if (!ok) break; if (i === sheets.length - 1) sendFeedback(); if (i === sheets.length - 1) toast(sheets.length > 1 ? `Saved ${sheets.length} images` : 'Saved ' + nm + (jpg ? '.jpg' : '.png'));
       }
     }
   } catch (e) { console.error(e); toast(e.message || 'Export failed'); }
@@ -1901,6 +1993,7 @@ function syncSettings() {
   $('#guidesCtl').hidden = S.page === 'fit';
   $('#bgColor').hidden = S.bg !== 'color';
   $('#qualCtl').hidden = S.fmt === 'png';
+  $('#share').checked = S.share !== false;
   $('#bgSeg button[data-v=transparent]').disabled = S.fmt !== 'png';
 }
 function flashPreview() { const b = $('#previewBox'); if (REDUCED) return; b.classList.remove('fresh'); void b.offsetWidth; b.classList.add('fresh'); }
@@ -1920,6 +2013,7 @@ $('#qual').oninput = e => { S.qual = +e.target.value; onSetting(); };
 $('#fname').oninput = e => { S.fname = e.target.value; saveSettings(); };
 $('#cw').onchange = e => { S.cw = clamp(+e.target.value || 85.6, 10, 600); onSetting(true); };
 $('#ch').onchange = e => { S.ch = clamp(+e.target.value || 54, 10, 600); onSetting(true); };
+$('#share').onchange = e => { S.share = e.target.checked; saveSettings(); };
 $('#exportBtn').onclick = doExport; $('#mExport').onclick = doExport;
 $('#mOut').onclick = () => $('#outPanel').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
 
@@ -1990,7 +2084,7 @@ function makeSample(back) {
 }
 
 
-syncSettings(); relist(); loadAI();
+syncSettings(); relist(); loadWeights(); loadAI();
 // opening screen
 (() => {
   const sp = $('#splash'); let done = false;
