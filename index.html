@@ -566,7 +566,7 @@ select,input[type=number],input[type=text].f{width:100%;border:1px solid var(--l
     <button class="btn primary" id="edApply">Apply</button>
   </div>
   <div class="ed-stage" id="edStage"><canvas id="edCanvas"></canvas></div>
-  <div class="ed-hint">Drag corners onto the card's edges. Middle dots move a whole side.<span class="kbd-hint"> Arrow keys nudge the selected point.</span></div>
+  <div class="ed-hint">Drag corners onto the card's edges, even past the photo edge if the card is cut off. Middle dots move a whole side.<span class="kbd-hint"> Arrow keys nudge the selected point.</span></div>
   <div class="ed-bottom">
     <button class="btn" id="edAuto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><path d="M9 12l2 2 4-4"/></svg>Auto-detect</button>
     <button class="btn" id="edFull"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/></svg>Whole photo</button>
@@ -1462,7 +1462,12 @@ async function aiCorners(source, W, H, mode = 'pad') {
       }
       if (n > bestN) { bestN = n; bx = sx / n; by = sy / n; }
     }
-    if (!bestN) return null;
+    if (!bestN) {
+      // weak corner (often one that is outside the photo): use the strongest spot if there is any signal
+      if (mx < 0.05) return null;
+      let bi = 0; for (let i = 1; i < h * w; i++) if (data[off + i] > data[off + bi]) bi = i;
+      bx = bi % w; by = (bi / w) | 0;
+    }
     pts.push([(bx + 0.5) / w, (by + 0.5) / h]);
   }
   if (pts.length < 4) return null;
@@ -1519,8 +1524,30 @@ function stretchToCard(q, targetAR, W, H) {
   const lng = qw >= qh ? [0, 1, 2, 3] : [1, 2, 3, 0], [a0, a1, a2, a3] = lng.map(k => q[k]), r = ar / targetAR - 1;
   const v1 = [a2[0] - a1[0], a2[1] - a1[1]], v0 = [a3[0] - a0[0], a3[1] - a0[1]], out = [];
   for (const nq of [[[a0[0] - v0[0] * r, a0[1] - v0[1] * r], [a1[0] - v1[0] * r, a1[1] - v1[1] * r], a2, a3], [a0, a1, [a2[0] + v1[0] * r, a2[1] + v1[1] * r], [a3[0] + v0[0] * r, a3[1] + v0[1] * r]]]) {
-    if (nq.some(pt => pt[0] < -0.03 * W || pt[1] < -0.03 * H || pt[0] > 1.03 * W || pt[1] > 1.03 * H)) continue;
-    out.push(orderQuad(nq.map(pt => [clamp(pt[0], 0, W - 1), clamp(pt[1], 0, H - 1)])));
+    if (nq.some(pt => pt[0] < -0.25 * W || pt[1] < -0.25 * H || pt[0] > 1.25 * W || pt[1] > 1.25 * H)) continue;
+    out.push(orderQuad(nq));
+  }
+  return out;
+}
+// A card cut off by the photo edge: one side of the outline lies on the edge and the outline is too
+// short for an ID card. Push that side outward until the outline has card shape.
+function extendCut(q, targetAR, W, H) {
+  const big = Math.max(W, H), m = 0.012 * big, out = [];
+  const edgeOf = p => p[0] < m ? 'l' : p[0] > W - 1 - m ? 'r' : p[1] < m ? 't' : p[1] > H - 1 - m ? 'b' : '';
+  for (let i = 0; i < 4; i++) {
+    const a = q[i], b = q[(i + 1) % 4], ea = edgeOf(a), eb = edgeOf(b);
+    if (!ea || ea !== eb) continue;
+    const pa = q[(i + 3) % 4], pb = q[(i + 2) % 4];            // corners on the opposite side
+    const Li = Math.hypot(b[0] - a[0], b[1] - a[1]), La = Math.hypot(a[0] - pa[0], a[1] - pa[1]), Lb = Math.hypot(b[0] - pb[0], b[1] - pb[1]), Ladj = (La + Lb) / 2;
+    for (const target of [Li * targetAR, Li / targetAR]) {
+      const r = target / Ladj;
+      if (r < 1.04 || r > 2.5) continue;
+      const nq = q.map(v => v.slice());
+      nq[i] = [pa[0] + (a[0] - pa[0]) * r, pa[1] + (a[1] - pa[1]) * r];
+      nq[(i + 1) % 4] = [pb[0] + (b[0] - pb[0]) * r, pb[1] + (b[1] - pb[1]) * r];
+      if (nq.some(pt => pt[0] < -0.6 * W || pt[1] < -0.6 * H || pt[0] > 1.6 * W || pt[1] > 1.6 * H)) continue;
+      out.push(orderQuad(nq));
+    }
   }
   return out;
 }
@@ -1542,6 +1569,7 @@ async function aiDetect(img, srcCanvas) {
     const sn = snapFine(gx, gy, W, H, raw, big);
     add(sn, raw, r.peaks, { pad, snapped: true });
     for (const e of stretchToCard(sn, targetAR, W, H)) add(snapFine(gx, gy, W, H, e, big), raw, r.peaks, { pad, snapped: true, extended: true });
+    for (const e of extendCut(sn, targetAR, W, H)) add(snapFine(gx, gy, W, H, e, big), raw, r.peaks, { pad, snapped: true, extended: true });
   }
   if (!cands.length) return null;
   let pick = 0;
@@ -1561,7 +1589,7 @@ async function detectQuad(p) {
     r = detectCard(cv, img); if (r) low = r.confidence < 0.02;
   }
   if (!r) return null;
-  const toSrc = q => q.map(([a, b]) => [clamp(a / s, 0, p.src.width - 1), clamp(b / s, 0, p.src.height - 1)]);
+  const toSrc = q => q.map(([a, b]) => [clamp(a / s, -0.5 * p.src.width, 1.5 * p.src.width), clamp(b / s, -0.5 * p.src.height, 1.5 * p.src.height)]);
   if (r.learn) { r.learn.cands.forEach(c => { c.q = toSrc(c.q); }); r.learn.w = p.src.width; r.learn.h = p.src.height; }
   return { q: toSrc(r.quad), low, learn: r.learn || null };
 }
@@ -1882,7 +1910,7 @@ async function lsCapture(manual) {
 // ---------- corner editor ----------
 const E = { p: null, q: null, q0: null, sel: -1, drag: null, view: null };
 function openEditor(p) {
-  E.p = p; E.q = p.quad.map(v => v.slice()); E.q0 = p.quad.map(v => v.slice()); E.sel = -1;
+  E.p = p; E.bounds = null; E.q = p.quad.map(v => v.slice()); E.q0 = p.quad.map(v => v.slice()); E.sel = -1;
   const ed = $('#ed'); ed.classList.remove('closing'); ed.hidden = false; $('#edTitle').textContent = p.name || 'Card';
   $('#edAuto').disabled = cvState !== 'ready';
   document.body.style.overflow = 'hidden'; requestAnimationFrame(drawEditor);
@@ -1902,11 +1930,25 @@ function drawEditor() {
   const cvs = $('#edCanvas'), st = $('#edStage'), dpr = window.devicePixelRatio || 1;
   const W = st.clientWidth, H = st.clientHeight; cvs.width = W * dpr; cvs.height = H * dpr;
   const x = cvs.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
-  const src = E.p.src, pad = 22, s = Math.min((W - pad * 2) / src.width, (H - pad * 2) / src.height);
-  const ox = (W - src.width * s) / 2, oy = (H - src.height * s) / 2; E.view = { s, ox, oy };
+  const src = E.p.src, pad = 22;
+  // the view covers the photo plus a margin (and any corner already outside it), so a card that is
+  // cut off by the photo edge can still be outlined; the view only re-fits when no corner is held
+  if (!E.drag || !E.bounds) {
+    const m = 0.12 * Math.max(src.width, src.height), xs = E.q.map(v => v[0]), ys = E.q.map(v => v[1]);
+    E.bounds = [Math.min(-m, ...xs.map(v => v - m * 0.5)), Math.min(-m, ...ys.map(v => v - m * 0.5)), Math.max(src.width + m, ...xs.map(v => v + m * 0.5)), Math.max(src.height + m, ...ys.map(v => v + m * 0.5))];
+  }
+  const [bx0, by0, bx1, by1] = E.bounds, s = Math.min((W - pad * 2) / (bx1 - bx0), (H - pad * 2) / (by1 - by0));
+  const ox = (W - (bx1 - bx0) * s) / 2 - bx0 * s, oy = (H - (by1 - by0) * s) / 2 - by0 * s; E.view = { s, ox, oy };
   x.drawImage(src, ox, oy, src.width * s, src.height * s);
   const P = v => [ox + v[0] * s, oy + v[1] * s];
   const sq = E.q.map(P);
+  // photo frame, so it is clear where the photo ends
+  x.save(); x.setLineDash([5, 5]); x.lineWidth = 1; x.strokeStyle = 'rgba(255,255,255,.35)'; x.strokeRect(ox - 0.5, oy - 0.5, src.width * s + 1, src.height * s + 1); x.restore();
+  // part of the outline beyond the photo: faint hatch (it will be filled with white)
+  x.save(); x.beginPath(); sq.forEach((v, i) => i ? x.lineTo(v[0], v[1]) : x.moveTo(v[0], v[1])); x.closePath(); x.clip();
+  x.beginPath(); x.rect(0, 0, W, H); x.rect(ox, oy, src.width * s, src.height * s); x.clip('evenodd');
+  x.fillStyle = 'rgba(255,255,255,.10)'; x.fillRect(0, 0, W, H);
+  x.strokeStyle = 'rgba(255,255,255,.14)'; x.lineWidth = 1; x.beginPath(); for (let k = -H; k < W; k += 10) { x.moveTo(k, 0); x.lineTo(k + H, H); } x.stroke(); x.restore();
   x.fillStyle = 'rgba(0,0,0,.5)'; x.fillRect(ox, oy, src.width * s, src.height * s);
   x.save(); x.beginPath(); sq.forEach((v, i) => i ? x.lineTo(v[0], v[1]) : x.moveTo(v[0], v[1])); x.closePath(); x.clip();
   x.drawImage(src, ox, oy, src.width * s, src.height * s); x.restore();
@@ -1955,7 +1997,7 @@ function tweenQuad(to) {
   st.addEventListener('pointermove', e => {
     if (!E.drag) return; const [ix, iy] = toImg(e), d = E.drag, dx = ix - d.last[0], dy = iy - d.last[1]; d.last = [ix, iy];
     const W = E.p.src.width - 1, H = E.p.src.height - 1;
-    const mv = i => { E.q[i][0] = clamp(E.q[i][0] + dx, 0, W); E.q[i][1] = clamp(E.q[i][1] + dy, 0, H); };
+    const mv = i => { E.q[i][0] = clamp(E.q[i][0] + dx, -0.5 * W, 1.5 * W); E.q[i][1] = clamp(E.q[i][1] + dy, -0.5 * H, 1.5 * H); };
     if (d.k < 4) mv(d.k); else { mv(d.k - 4); mv((d.k - 3) % 4); }
     drawEditor();
   });
